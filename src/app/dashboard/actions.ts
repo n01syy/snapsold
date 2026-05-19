@@ -1,6 +1,7 @@
 "use server";
 
 import { getSoldListings } from "@/lib/ebay";
+import { enrichBarcodeProductTitle } from "@/lib/barcode-title";
 import { ListingsNotFoundError } from "@/lib/errors";
 import { identifyProduct } from "@/lib/identify";
 import { findMockProductById } from "@/lib/mock-data";
@@ -48,11 +49,12 @@ export async function identifyAndPrice(
       };
     }
 
-    const analysis = await runPricingFor(identified.product);
+    const { product: pricedProduct, analysis } =
+      await runPricingFor(identified.product);
     return {
       ok: true,
       kind: "priced",
-      product: identified.product,
+      product: pricedProduct,
       analysis,
     };
   } catch (err) {
@@ -82,8 +84,8 @@ export async function priceProductById(productId: string): Promise<AnalyzeResult
     if (!def) {
       throw new Error("We couldn't find that variant — try a new search.");
     }
-    const analysis = await runPricingFor(def.product);
-    return { ok: true, kind: "priced", product: def.product, analysis };
+    const { product: pricedProduct, analysis } = await runPricingFor(def.product);
+    return { ok: true, kind: "priced", product: pricedProduct, analysis };
   } catch (err) {
     if (err instanceof ListingsNotFoundError) {
       return { ok: true, kind: "not_found", query: err.query };
@@ -94,9 +96,11 @@ export async function priceProductById(productId: string): Promise<AnalyzeResult
 
 async function runPricingFor(
   product: IdentifiedProduct,
-): Promise<PriceAnalysis> {
+): Promise<{ product: IdentifiedProduct; analysis: PriceAnalysis }> {
   const listings = await getSoldListings(product);
-  return analyzePrices(listings, { windowDays: 14 });
+  const enriched = enrichBarcodeProductTitle(product, listings);
+  const analysis = analyzePrices(listings, { windowDays: 14 });
+  return { product: enriched, analysis };
 }
 
 function parseFormData(formData: FormData): IdentifyInput {

@@ -38,6 +38,8 @@ export interface UpcLookupResult {
 const CACHE = new Map<string, { result: UpcLookupResult | null; expiresAt: number }>();
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const REQUEST_TIMEOUT_MS = 4500;
+/** Bump when lookup/title resolution logic changes to drop stale cache entries. */
+const CACHE_VERSION = 2;
 
 /**
  * Resolve a UPC/EAN to a product title. Returns null when:
@@ -54,24 +56,35 @@ export async function lookupUpc(
   const barcode = rawBarcode.trim();
   if (!/^[0-9]{8,14}$/.test(barcode)) return null;
 
-  const cached = CACHE.get(barcode);
+  const cacheKey = `${barcode}@${CACHE_VERSION}`;
+
+  const cached = CACHE.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.result;
   }
 
   const result = await fetchFromUpcItemDb(barcode);
-  CACHE.set(barcode, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+  CACHE.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS });
   return result;
+}
+
+interface UpcItemDbOffer {
+  title?: string;
+  merchant?: string;
+}
+
+interface UpcItemDbItem {
+  title?: string;
+  brand?: string;
+  category?: string;
+  description?: string;
+  offers?: UpcItemDbOffer[];
 }
 
 interface UpcItemDbResponse {
   code?: string;
   total?: number;
-  items?: Array<{
-    title?: string;
-    brand?: string;
-    category?: string;
-  }>;
+  items?: UpcItemDbItem[];
 }
 
 async function fetchFromUpcItemDb(
@@ -98,19 +111,82 @@ async function fetchFromUpcItemDb(
     const data = (await res.json()) as UpcItemDbResponse;
     if (data.code !== "OK") return null;
     const first = data.items?.[0];
-    if (!first?.title) return null;
+    if (!first) return null;
 
-    return {
-      title: cleanTitle(first.title),
-      brand: first.brand?.trim() || undefined,
-      category: first.category?.trim() || undefined,
-    };
+    return resolveUpcProduct(first);
   } catch {
     // AbortError (timeout) or any network failure — silently null.
     return null;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * UPCitemdb's top-level `title` is often a useless category label
+ * ("FRUIT JUICE COCKTAIL"). Merchant `offers[].title` entries
+ * usually carry the real shelf name ("AriZona Watermelon …, 1 gal").
+ */
+function resolveUpcProduct(item: UpcItemDbItem): UpcLookupResult | null {
+  const brand = item.brand?.trim() || undefined;
+  const category = item.category?.trim() || undefined;
+
+  const candidates: string[] = [];
+  for (const offer of item.offers ?? []) {
+    if (offer.title?.trim()) candidates.push(offer.title.trim());
+  }
+  if (item.title?.trim()) candidates.push(item.title.trim());
+
+  if (candidates.length === 0) return null;
+
+  let title = pickBestUpcTitle(candidates, brand);
+  title = cleanTitle(title);
+  title = normalizeProductTitle(title);
+
+  if (brand && !title.toLowerCase().includes(brand.toLowerCase())) {
+    title = `${brand} ${title}`;
+  }
+
+  title = cleanTitle(title);
+  if (!title) return null;
+
+  return { title, brand, category };
+}
+
+function pickBestUpcTitle(candidates: string[], brand?: string): string {
+  let best = candidates[0] ?? "";
+  let bestScore = -Infinity;
+
+  for (const raw of candidates) {
+    const t = raw.replace(/\s+/g, " ").trim();
+    if (!t) continue;
+
+    let score = t.split(/\s+/).length;
+    const lower = t.toLowerCase();
+
+    if (brand && lower.includes(brand.toLowerCase())) score += 6;
+    if (/ingredients:/i.test(t)) score -= 20;
+    if (lower === "fruit juice cocktail" || lower === "juice cocktail") {
+      score -= 8;
+    }
+    if (t.length > 100) score -= 2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
+  }
+
+  return best;
+}
+
+function normalizeProductTitle(title: string): string {
+  return title
+    .replace(/\s*[-–—,]\s*\d+(?:\.\d+)?\s*(?:fl\s*)?oz\.?\s*$/i, "")
+    .replace(/\s*,\s*\d+(?:\.\d+)?\s*(?:fl\s*)?oz\.?\s*$/i, "")
+    .replace(/\s*[-–—,]\s*\d+\s*gal(?:lon)?s?\.?\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
