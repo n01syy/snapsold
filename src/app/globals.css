@@ -264,6 +264,12 @@
 
 /* Scrollbar polish — quiet, palette-tinted. */
 @layer base {
+  html,
+  body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;

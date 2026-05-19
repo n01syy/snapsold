@@ -54,7 +54,7 @@ export default async function DashboardPage({
   return (
     <>
       <SiteNav />
-      <main className="flex flex-1 flex-col px-4 py-12 sm:py-16 lg:py-20">
+      <main className="flex flex-1 flex-col overflow-x-clip px-3 py-12 sm:px-4 sm:py-16 lg:py-20">
         {/*
           5xl (1024px) is the sweet spot now that the analysis card
           renders the trend pill, condition strip, listing-title

@@ -29,7 +29,7 @@ export function Logo({ className, showWordmark = true }: LogoProps) {
         className="h-9 w-9 select-none"
       />
       {showWordmark && (
-        <span className="font-display text-lg font-bold tracking-tight">
+        <span className="font-display text-base font-bold tracking-tight sm:text-lg">
           Snapsold
         </span>
       )}

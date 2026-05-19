@@ -53,7 +53,7 @@ export function CandidateList({
     <div className="relative">
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-12 -inset-y-8 -z-10 opacity-40 blur-3xl"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-40 blur-3xl sm:-inset-x-8 sm:-inset-y-8"
         style={{
           background:
             "radial-gradient(ellipse 50% 50% at 20% 0%, #f4d35e 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 100% 100%, #f95738 0%, transparent 60%)",

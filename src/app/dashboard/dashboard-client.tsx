@@ -263,7 +263,7 @@ function NotFoundView({
     <div className="relative">
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-12 -inset-y-8 -z-10 opacity-40 blur-3xl"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-40 blur-3xl sm:-inset-x-8 sm:-inset-y-8"
         style={{
           background:
             "radial-gradient(ellipse 50% 50% at 50% 30%, #f4d35e 0%, transparent 65%)",

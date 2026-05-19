@@ -43,10 +43,11 @@ export function ListingHandoff({ title }: ListingHandoffProps) {
       variant="default"
       size="sm"
       render={<a href={url} target="_blank" rel="noreferrer" />}
-      className="shrink-0 gap-1.5 bg-tomato font-display font-semibold text-beige shadow-sm shadow-tomato/20 hover:bg-tomato/90"
+      className="min-w-0 flex-1 gap-1.5 bg-tomato px-2 font-display text-xs font-semibold text-beige shadow-sm shadow-tomato/20 hover:bg-tomato/90 sm:flex-none sm:px-2.5 sm:text-sm"
     >
-      <ExternalLink className="h-4 w-4" />
-      List on eBay
+      <ExternalLink className="h-4 w-4 shrink-0" />
+      <span className="truncate sm:hidden">eBay</span>
+      <span className="hidden truncate sm:inline">List on eBay</span>
     </Button>
   );
 }

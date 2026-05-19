@@ -22,24 +22,31 @@ export function PriceTile({ label, value, sublabel, tone }: PriceTileProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border p-3",
+        "min-w-0 rounded-xl border p-2 sm:p-3",
         isBrand
           ? "border-tomato/40 bg-tomato/10 ring-1 ring-tomato/30"
           : "border-border/60 bg-muted/30",
       )}
     >
-      <div className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
+      <div className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
+        {label === "Recommended" ? (
+          <>
+            <span className="sm:hidden">Rec.</span>
+            <span className="hidden sm:inline">Recommended</span>
+          </>
+        ) : (
+          label
+        )}
       </div>
       <div
         className={cn(
-          "mt-1 text-2xl font-bold leading-none tracking-tight",
+          "mt-1 text-lg font-bold leading-none tracking-tight tabular-nums sm:text-2xl",
           isBrand && "text-tomato",
         )}
       >
         ${value}
       </div>
-      <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
+      <div className="mt-1 truncate text-[10px] leading-snug text-muted-foreground sm:text-[11px]">
         {sublabel}
       </div>
     </div>

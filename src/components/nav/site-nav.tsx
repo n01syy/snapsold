@@ -25,7 +25,7 @@ export async function SiteNav() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
         <Link href="/" aria-label="Snapsold home">
           <Logo />
         </Link>
@@ -43,7 +43,7 @@ export async function SiteNav() {
           ))}
         </ul>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-2">
           {user ? (
             <>
               <span className="hidden max-w-[140px] truncate text-xs text-muted-foreground sm:inline">
@@ -75,10 +75,11 @@ export async function SiteNav() {
                 href="/signup"
                 className={cn(
                   buttonVariants({ size: "sm" }),
-                  "bg-tomato font-display font-semibold text-beige shadow-sm shadow-tomato/20 hover:bg-tomato/90",
+                  "bg-tomato px-2 font-display text-xs font-semibold text-beige shadow-sm shadow-tomato/20 hover:bg-tomato/90 sm:px-2.5 sm:text-sm",
                 )}
               >
-                Sign up free
+                <span className="sm:hidden">Sign up</span>
+                <span className="hidden sm:inline">Sign up free</span>
               </Link>
             </>
           )}

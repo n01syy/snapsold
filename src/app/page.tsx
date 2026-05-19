@@ -11,7 +11,7 @@ export default function LandingPage() {
   return (
     <>
       <SiteNav />
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-clip">
         <Hero />
         <Features />
         <HowItWorks />

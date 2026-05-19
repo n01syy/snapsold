@@ -98,10 +98,10 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
   }, [analysis, selectedCondition]);
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 overflow-x-clip">
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-12 -inset-y-8 -z-10 opacity-60 blur-3xl"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-60 blur-3xl sm:-inset-x-8 sm:-inset-y-8"
         style={{
           background:
             "radial-gradient(ellipse 50% 50% at 25% 50%, #f95738 0%, transparent 65%), radial-gradient(ellipse 50% 50% at 80% 50%, #f4d35e 0%, transparent 65%)",
@@ -124,10 +124,10 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
+          className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
         >
           {/* LEFT — identification + prices */}
-          <div className="border-border/60 p-6 sm:p-8 lg:border-r">
+          <div className="min-w-0 border-border/60 p-4 sm:p-6 lg:border-r lg:p-8">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5 text-tomato" />
               {product.source === "image"
@@ -158,7 +158,7 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
               )}
             </div>
 
-            <div className="mt-7 grid grid-cols-3 gap-3">
+            <div className="mt-7 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
               <PriceTile
                 label="Quick"
                 value={adjustedPrices.quick}
@@ -201,12 +201,12 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
                 >
                   {product.title}
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex min-w-0 gap-2 sm:shrink-0">
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={copyTitle}
-                    className="gap-1.5 font-display font-semibold"
+                    className="min-w-0 flex-1 gap-1.5 font-display font-semibold sm:flex-none"
                     aria-live="polite"
                   >
                     <ClipboardCopy className="h-4 w-4" />
@@ -231,8 +231,8 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
           </div>
 
           {/* RIGHT — histogram + reasoning */}
-          <div className="p-6 sm:p-8">
-            <div className="flex items-center justify-between">
+          <div className="min-w-0 p-4 sm:p-6 lg:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <TrendingUp className="h-4 w-4 text-tomato" />
                 Sold price distribution
@@ -498,7 +498,7 @@ function ConditionPicker({
                 onClick={() => onSelect(isActive ? null : r.condition)}
                 aria-pressed={isActive}
                 className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-1.5 text-left transition-colors",
+                  "flex w-full flex-col gap-1 rounded-lg border px-3 py-1.5 text-left transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-3",
                   isActive
                     ? "border-tomato/50 bg-tomato/10 ring-1 ring-tomato/20"
                     : "border-border/60 bg-muted/30 hover:border-tomato/30 hover:bg-tomato/5",
@@ -564,20 +564,20 @@ function FeeRow({
   const m = computeNet(prices.max);
   const rateLabel = `~${Math.round(DEFAULT_FVF_RATE * 1000) / 10}% + $${DEFAULT_FIXED_FEE.toFixed(2)}`;
   return (
-    <div className="mt-3 rounded-xl border border-border/60 bg-muted/20 p-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className="mt-3 rounded-xl border border-border/60 bg-muted/20 p-2.5 sm:p-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          <Wallet className="h-3 w-3 text-tomato" />
+          <Wallet className="h-3 w-3 shrink-0 text-tomato" />
           After eBay fees
         </div>
         <span
-          className="text-[10px] text-muted-foreground/80"
+          className="hidden min-[400px]:inline text-[10px] text-muted-foreground/80"
           title="eBay Final Value Fee + per-order fixed fee. Real rate varies by category and store level."
         >
           {rateLabel}
         </span>
       </div>
-      <dl className="mt-2 grid grid-cols-3 gap-3">
+      <dl className="mt-2 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
         <NetCell label="Quick net" net={q.net} />
         <NetCell label="Recommended net" net={r.net} highlight />
         <NetCell label="Max net" net={m.net} />
@@ -595,14 +595,23 @@ function NetCell({
   net: number;
   highlight?: boolean;
 }) {
+  const shortLabel =
+    label === "Recommended net"
+      ? "Rec."
+      : label === "Quick net"
+        ? "Quick"
+        : label === "Max net"
+          ? "Max"
+          : label;
   return (
     <div className="min-w-0">
       <dt className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
+        <span className="sm:hidden">{shortLabel}</span>
+        <span className="hidden sm:inline">{label}</span>
       </dt>
       <dd
         className={cn(
-          "mt-0.5 text-base font-bold leading-none tracking-tight tabular-nums",
+          "mt-0.5 text-sm font-bold leading-none tracking-tight tabular-nums sm:text-base",
           highlight && "text-tomato",
         )}
       >
