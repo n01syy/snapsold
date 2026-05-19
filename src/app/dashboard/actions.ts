@@ -139,6 +139,15 @@ function parseFormData(formData: FormData): IdentifyInput {
 }
 
 function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
+  if (err instanceof Error) {
+    // Never leak server config details to end users in production.
+    if (
+      process.env.NODE_ENV === "production" &&
+      /is not configured/i.test(err.message)
+    ) {
+      return "Pricing is temporarily unavailable. Please try again in a few minutes.";
+    }
+    return err.message;
+  }
   return "Unexpected pricing error.";
 }

@@ -24,7 +24,7 @@ export const env = {
    */
   get useMockEbay(): boolean {
     return (
-      process.env.EBAY_USE_MOCK === "true" || process.env.SERPAPI_KEY === ""
+      process.env.EBAY_USE_MOCK === "true" || this.serpApiKey.length === 0
     );
   },
 
