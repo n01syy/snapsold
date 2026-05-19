@@ -115,12 +115,18 @@ export function DashboardClient({
           analysis: result.analysis,
         });
       } catch (err) {
+        const raw =
+          err instanceof Error
+            ? err.message
+            : "Something went wrong — please try again.";
+        const message = /unexpected response was received from the server/i.test(
+          raw,
+        )
+          ? "Photo upload failed — the image may be too large or the request timed out. Try again, use a smaller photo, or search by name."
+          : raw;
         setPhase({
           kind: "error",
-          message:
-            err instanceof Error
-              ? err.message
-              : "Something went wrong — please try again.",
+          message,
         });
       }
     });

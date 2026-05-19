@@ -4,6 +4,9 @@ import { SiteNav } from "@/components/nav/site-nav";
 import { DashboardClient } from "./dashboard-client";
 import type { UploadMode } from "@/components/dashboard/upload-card";
 
+/** Photo ID + SerpAPI can exceed Vercel's default 10s on large images. */
+export const maxDuration = 60;
+
 export const metadata: Metadata = {
   title: "Dashboard",
   description:

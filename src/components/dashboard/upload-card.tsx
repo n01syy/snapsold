@@ -19,6 +19,7 @@ import {
   type FormEvent,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { compressImageForUpload } from "@/lib/compress-image";
 import { cn } from "@/lib/utils";
 
 /*
@@ -79,6 +80,8 @@ export function UploadCard({
   const [preview, setPreview] = useState<{ name: string; url: string } | null>(
     null,
   );
+  const [preparingImage, setPreparingImage] = useState(false);
+  const busy = pending || preparingImage;
   const [error, setError] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,7 +112,7 @@ export function UploadCard({
   }, [preview]);
 
   const acceptFile = useCallback(
-    (file: File | null | undefined) => {
+    async (file: File | null | undefined) => {
       setError(null);
       if (!file) return;
       if (!/^image\//.test(file.type)) {
@@ -120,8 +123,17 @@ export function UploadCard({
         setError("Image is over 10 MB — try a smaller file.");
         return;
       }
+
       setPreview({ name: file.name, url: URL.createObjectURL(file) });
-      onSubmit({ mode: "image", file });
+      setPreparingImage(true);
+      try {
+        const prepared = await compressImageForUpload(file);
+        onSubmit({ mode: "image", file: prepared });
+      } catch {
+        onSubmit({ mode: "image", file });
+      } finally {
+        setPreparingImage(false);
+      }
     },
     [onSubmit],
   );
@@ -179,7 +191,7 @@ export function UploadCard({
           active={mode === "image"}
           onClick={() => setMode("image")}
           icon={<ImageUp className="h-4 w-4" />}
-          disabled={pending}
+          disabled={busy}
         >
           Photo
         </ModeTab>
@@ -187,7 +199,7 @@ export function UploadCard({
           active={mode === "name"}
           onClick={() => setMode("name")}
           icon={<Search className="h-4 w-4" />}
-          disabled={pending}
+          disabled={busy}
         >
           Name
         </ModeTab>
@@ -195,7 +207,7 @@ export function UploadCard({
           active={mode === "barcode"}
           onClick={() => setMode("barcode")}
           icon={<ScanBarcode className="h-4 w-4" />}
-          disabled={pending}
+          disabled={busy}
         >
           Barcode
         </ModeTab>
@@ -212,22 +224,22 @@ export function UploadCard({
           >
             <div
               role="button"
-              tabIndex={pending ? -1 : 0}
-              aria-disabled={pending}
+              tabIndex={busy ? -1 : 0}
+              aria-disabled={busy}
               onDragOver={(e) => {
                 e.preventDefault();
-                if (!pending) setIsDragging(true);
+                if (!busy) setIsDragging(true);
               }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={(e) => {
                 e.preventDefault();
-                if (pending) return;
+                if (busy) return;
                 setIsDragging(false);
                 acceptFile(e.dataTransfer.files?.[0]);
               }}
-              onClick={() => !pending && fileInputRef.current?.click()}
+              onClick={() => !busy && fileInputRef.current?.click()}
               onKeyDown={(e) => {
-                if (pending) return;
+                if (busy) return;
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   fileInputRef.current?.click();
@@ -235,7 +247,7 @@ export function UploadCard({
               }}
               className={cn(
                 "group relative grid h-56 w-full cursor-pointer place-items-center overflow-hidden rounded-2xl border-2 border-dashed bg-card/60 transition-all",
-                pending && "cursor-not-allowed opacity-60",
+                busy && "cursor-not-allowed opacity-60",
                 isDragging
                   ? "scale-[1.01] border-tomato bg-tomato/10"
                   : "border-navy/25 hover:border-tomato/60 hover:bg-card/80",
@@ -247,17 +259,21 @@ export function UploadCard({
                 accept="image/*"
                 className="sr-only"
                 onChange={handleFileInput}
-                disabled={pending}
+                disabled={busy}
               />
 
-              {pending && preview ? (
+              {busy ? (
                 <div className="flex flex-col items-center gap-3 text-center">
                   <Loader2 className="h-7 w-7 animate-spin text-tomato" />
                   <p className="text-sm font-semibold tracking-tight">
-                    Analysing {preview.name}…
+                    {preparingImage
+                      ? "Preparing photo…"
+                      : `Analysing ${preview?.name ?? "photo"}…`}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Identifying product, fetching sold listings, scoring confidence.
+                    {preparingImage
+                      ? "Optimising size for upload."
+                      : "Identifying product, fetching sold listings, scoring confidence."}
                   </p>
                 </div>
               ) : preview ? (
@@ -306,7 +322,7 @@ export function UploadCard({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder='e.g. "Nintendo Switch OLED" or "Air Jordan 1 Chicago"'
-              disabled={pending}
+              disabled={busy}
               className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
             />
             <Button
@@ -342,7 +358,7 @@ export function UploadCard({
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
-                disabled={pending}
+                disabled={busy}
                 className="inline-flex items-center gap-1.5 rounded-full border border-tomato/30 bg-tomato/10 px-3 py-1 font-display text-xs font-semibold text-tomato transition-colors hover:bg-tomato/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Camera className="h-3.5 w-3.5" />
@@ -359,7 +375,7 @@ export function UploadCard({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={14}
-                disabled={pending}
+                disabled={busy}
                 className="h-12 flex-1 rounded-lg border border-border/60 bg-background/60 px-4 font-mono text-base tracking-wider outline-none placeholder:text-muted-foreground/60 focus:border-tomato/60 disabled:opacity-60"
               />
               <Button
