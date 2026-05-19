@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─────────────────────────────────────────────
+   Design tokens exposed to Tailwind v4.
+   Palette source — user-provided combo:
+     #083d77 Regal Navy
+     #ebebd3 Beige
+     #f4d35e Royal Gold
+     #ee964b Sandy Brown
+     #f95738 Tomato
+   Default theme is LIGHT (warm editorial) — dark
+   mode is kept available for a future toggle.
+   ───────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sora);
+  --font-display: var(--font-sora);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Brand color tokens — Tailwind utility classes work directly:
+     bg-navy, text-tomato, border-gold, ring-sandy/30, etc. */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-navy: #083d77;
+  --color-beige: #ebebd3;
+  --color-gold: #f4d35e;
+  --color-sandy: #ee964b;
+  --color-tomato: #f95738;
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ─────────────────────────────────────────────
+   LIGHT theme — the default for Snapsold now.
+   Cream/beige paper background, deep navy ink,
+   tomato as the punchy CTA, gold/sandy accents.
+   ───────────────────────────────────────────── */
+:root {
+  --background: oklch(0.93 0.03 95);          /* #ebebd3 beige */
+  --foreground: oklch(0.3 0.09 257);          /* #083d77 navy */
+  --card: oklch(0.985 0.012 90);              /* near-white warm */
+  --card-foreground: oklch(0.3 0.09 257);
+  --popover: oklch(0.985 0.012 90);
+  --popover-foreground: oklch(0.3 0.09 257);
+  --primary: oklch(0.66 0.21 35);             /* #f95738 tomato */
+  --primary-foreground: oklch(0.97 0.02 90);  /* beige-on-tomato */
+  --secondary: oklch(0.87 0.035 90);          /* deeper beige */
+  --secondary-foreground: oklch(0.3 0.09 257);
+  --muted: oklch(0.88 0.03 90);
+  --muted-foreground: oklch(0.45 0.06 257);   /* softer navy */
+  --accent: oklch(0.85 0.13 85);              /* #f4d35e gold-soft */
+  --accent-foreground: oklch(0.3 0.09 257);
+  --destructive: oklch(0.6 0.22 30);          /* tomato-as-destructive */
+  --border: oklch(0.3 0.09 257 / 0.15);
+  --input: oklch(0.3 0.09 257 / 0.12);
+  --ring: oklch(0.66 0.21 35);                /* tomato focus ring */
+
+  --chart-1: oklch(0.66 0.21 35);   /* tomato */
+  --chart-2: oklch(0.74 0.16 55);   /* sandy */
+  --chart-3: oklch(0.85 0.15 90);   /* gold */
+  --chart-4: oklch(0.3 0.09 257);   /* navy */
+  --chart-5: oklch(0.93 0.03 95);   /* beige */
+
+  --radius: 0.75rem;
+
+  --brand: oklch(0.66 0.21 35);              /* tomato */
+  --brand-foreground: oklch(0.97 0.02 90);   /* beige */
+
+  --sidebar: oklch(0.96 0.018 90);
+  --sidebar-foreground: oklch(0.3 0.09 257);
+  --sidebar-primary: oklch(0.66 0.21 35);
+  --sidebar-primary-foreground: oklch(0.97 0.02 90);
+  --sidebar-accent: oklch(0.88 0.03 90);
+  --sidebar-accent-foreground: oklch(0.3 0.09 257);
+  --sidebar-border: oklch(0.3 0.09 257 / 0.12);
+  --sidebar-ring: oklch(0.66 0.21 35);
+}
+
+/* ─────────────────────────────────────────────
+   DARK theme — inverted palette: deep navy ink
+   base, beige text, tomato accents. Kept for a
+   future theme toggle.
+   ───────────────────────────────────────────── */
+.dark {
+  --background: oklch(0.2 0.06 257);
+  --foreground: oklch(0.94 0.025 90);
+  --card: oklch(0.24 0.06 257);
+  --card-foreground: oklch(0.94 0.025 90);
+  --popover: oklch(0.24 0.06 257);
+  --popover-foreground: oklch(0.94 0.025 90);
+  --primary: oklch(0.7 0.21 35);
+  --primary-foreground: oklch(0.2 0.06 257);
+  --secondary: oklch(0.28 0.06 257);
+  --secondary-foreground: oklch(0.94 0.025 90);
+  --muted: oklch(0.28 0.06 257);
+  --muted-foreground: oklch(0.75 0.04 90);
+  --accent: oklch(0.85 0.15 90);
+  --accent-foreground: oklch(0.2 0.06 257);
+  --destructive: oklch(0.65 0.22 30);
+  --border: oklch(0.94 0.025 90 / 12%);
+  --input: oklch(0.94 0.025 90 / 14%);
+  --ring: oklch(0.7 0.21 35);
+
+  --chart-1: oklch(0.7 0.21 35);
+  --chart-2: oklch(0.78 0.16 55);
+  --chart-3: oklch(0.88 0.15 90);
+  --chart-4: oklch(0.94 0.025 90);
+  --chart-5: oklch(0.65 0.12 257);
+
+  --brand: oklch(0.7 0.21 35);
+  --brand-foreground: oklch(0.2 0.06 257);
+
+  --sidebar: oklch(0.22 0.06 257);
+  --sidebar-foreground: oklch(0.94 0.025 90);
+  --sidebar-primary: oklch(0.7 0.21 35);
+  --sidebar-primary-foreground: oklch(0.2 0.06 257);
+  --sidebar-accent: oklch(0.28 0.06 257);
+  --sidebar-accent-foreground: oklch(0.94 0.025 90);
+  --sidebar-border: oklch(0.94 0.025 90 / 12%);
+  --sidebar-ring: oklch(0.7 0.21 35);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  /* Base color lives on <html> so the page never shows a flash of
+     the browser default and so the body's pseudo-element backdrop
+     (below) can sit on top of it via z-index: -1. */
+  html {
+    @apply bg-background font-sans;
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply text-foreground antialiased;
+  }
+  /* Warm editorial wash — a soft gold sunrise top-right and a
+     tomato whisper bottom-left, sitting on the beige paper base.
+     Painted into a position:fixed pseudo-element with pointer-events
+     disabled so it stays glued to the viewport WITHOUT the
+     `background-attachment: fixed` repaint penalty that was making
+     scrolling feel sluggish. The element itself never moves, so the
+     gradient is composited once and reused on every scroll frame. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        ellipse 70% 55% at 100% 0%,
+        oklch(0.85 0.13 85 / 0.45),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 60% 50% at 0% 100%,
+        oklch(0.7 0.18 35 / 0.18),
+        transparent 70%
+      );
+  }
+
+  /* Bold, tight Sora for headings. Uses the runtime CSS var that
+     next/font sets on <html>, with full fallback chain so a font
+     download failure still renders a clean sans (never serif). */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sora), var(--font-geist-sans), ui-sans-serif,
+      system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+  h1 {
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Utilities
+   ───────────────────────────────────────────── */
+
+/* Hero-headline gradient — a single sunset sweep across the warm
+   half of the palette. Used sparingly: just for the highlighted
+   line of the hero and the footer CTA. */
+@utility text-gradient-brand {
+  background-image: linear-gradient(
+    100deg,
+    #f95738 0%,   /* tomato */
+    #ee964b 50%,  /* sandy */
+    #f4d35e 100%  /* gold */
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Soft warm halo around hero cards — replaces the previous neon ring. */
+@utility glow-ring {
+  box-shadow:
+    0 0 0 1px oklch(0.3 0.09 257 / 0.08),
+    0 10px 30px -12px oklch(0.66 0.21 35 / 0.25),
+    0 18px 50px -10px oklch(0.3 0.09 257 / 0.12);
+}
+
+/* Display font helper for non-heading marketing text (wordmark,
+   eyebrows, button labels that want the editorial Sora feel). */
+@utility font-display {
+  font-family: var(--font-sora), var(--font-geist-sans), ui-sans-serif,
+    system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* Scrollbar polish — quiet, palette-tinted. */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.3 0.09 257 / 0.18);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.3 0.09 257 / 0.3);
+  }
+}
