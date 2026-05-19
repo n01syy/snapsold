@@ -6,6 +6,7 @@ import {
 } from "./mock-data";
 import { identifyProductFromImage } from "./providers/vision-llm";
 import { lookupUpc } from "./providers/upc-lookup";
+import { refineTitleForSearch } from "./search-query";
 import type { IdentifiedProduct, IdentifyInput, IdentifyResult } from "./types";
 
 /**
@@ -113,17 +114,22 @@ async function identifyFromBarcode(barcode: string): Promise<IdentifyResult> {
         upc: code,
         confidence: 0.85,
         source: "barcode",
-        // Use the resolved product name as the eBay search query
-        // — much higher recall than the bare 12-digit code.
-        searchQuery: dbHit.title,
+        // Short query for UI links; live fetch prefers UPC digits first.
+        searchQuery: refineTitleForSearch(dbHit.title, dbHit.brand),
       },
     };
   }
 
   // ── Tier 3: raw eBay fallback ─────────────────────────────────
-  // Catalogue's generic fallback already has the right shape
-  // (source: "barcode", searchQuery: <digits>). Hand it back as-is.
-  return { kind: "match", product: catalogue.product };
+  return {
+    kind: "match",
+    product: {
+      ...catalogue.product,
+      upc: code,
+      source: "barcode",
+      searchQuery: code,
+    },
+  };
 }
 
 /**

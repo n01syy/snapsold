@@ -7,6 +7,7 @@ import {
 } from "./cache/listings-cache";
 import { env } from "./env";
 import { ListingsNotFoundError } from "./errors";
+import { filterRelevantListings } from "./listing-relevance";
 import {
   findMockProductByBarcode,
   findMockProductById,
@@ -15,7 +16,11 @@ import {
   generateSoldListings,
 } from "./mock-data";
 import { fetchSoldListings } from "./providers/serpapi-ebay";
+import { buildEbaySearchQueries } from "./search-query";
 import type { IdentifiedProduct, SoldListing } from "./types";
+
+/** Minimum relevant sold listings before we accept a query result. */
+const MIN_RELEVANT_LISTINGS = 3;
 
 /**
  * Fetch the recent sold-listings sample for an identified product.
@@ -63,39 +68,70 @@ export async function getSoldListings(
     return mockListingsFor(product);
   }
 
-  const query = (product.searchQuery ?? product.title).trim();
-  if (!query) {
+  const queries = buildEbaySearchQueries(product);
+  if (queries.length === 0) {
     log("empty-query-fallback", product.id);
     return mockListingsFor(product);
   }
 
   const synthetic = !isCatalogued(product);
-  const cacheKey = cacheKeyFor(query, env.ebayDomain);
 
-  // Path 2: cache hit. Cached listings are always real (we never
-  // cache empty results), so synthetic vs catalogued doesn't matter.
-  const hit = cacheGet(cacheKey);
-  if (hit) {
-    log("cache-hit", query, { listings: hit.listings.length });
-    return hit.listings;
-  }
-
-  // Path 3: live fetch.
+  // Path 2 + 3: cache + live fetch across ordered query variants.
   try {
+    const listings = await fetchBestLiveListings(product, queries);
+    return listings;
+  } catch (err) {
+    if (err instanceof ListingsNotFoundError) {
+      if (synthetic) throw err;
+      return mockListingsFor(product);
+    }
+
+    const msg = err instanceof Error ? err.message : String(err);
+    log("live-error", queries.join(" | "), { error: msg, synthetic });
+
+    if (synthetic) {
+      throw err;
+    }
+
+    return mockListingsFor(product);
+  }
+}
+
+/**
+ * Try each eBay query in order (UPC first for barcodes, then a
+ * refined title). After each fetch, drop bulk/irrelevant listings
+ * before pricing so a bottle of water doesn't inherit a case price.
+ */
+async function fetchBestLiveListings(
+  product: IdentifiedProduct,
+  queries: string[],
+): Promise<SoldListing[]> {
+  let best: SoldListing[] = [];
+  let lastQuery = queries[0] ?? "";
+
+  for (const query of queries) {
+    lastQuery = query;
+    const cacheKey = cacheKeyFor(query, env.ebayDomain);
+    const hit = cacheGet(cacheKey);
+
+    if (hit) {
+      const filtered = filterRelevantListings(hit.listings, product);
+      log("cache-hit", query, {
+        raw: hit.listings.length,
+        relevant: filtered.length,
+      });
+      if (filtered.length > best.length) best = filtered;
+      if (filtered.length >= MIN_RELEVANT_LISTINGS) return filtered;
+      continue;
+    }
+
     const startedAt = Date.now();
     const result = await fetchSoldListings(query);
     const elapsedMs = Date.now() - startedAt;
 
     if (result.listings.length === 0) {
-      log("live-empty", query, { elapsedMs, synthetic });
-      if (synthetic) {
-        // Honest path — we have no curated fallback for this
-        // product, and the live result is genuinely empty. Tell
-        // the user; don't fabricate.
-        throw new ListingsNotFoundError(query);
-      }
-      // Catalogued product, eBay momentarily empty → mock is OK.
-      return mockListingsFor(product);
+      log("live-empty", query, { elapsedMs });
+      continue;
     }
 
     cacheSet(
@@ -104,34 +140,22 @@ export async function getSoldListings(
       result.totalResults,
       env.listingsCacheTtlSeconds,
     );
+
+    const filtered = filterRelevantListings(result.listings, product);
     log("live-fetch", query, {
-      listings: result.listings.length,
+      raw: result.listings.length,
+      relevant: filtered.length,
       total: result.totalResults,
       elapsedMs,
       cacheEntries: cacheSize(),
     });
-    return result.listings;
-  } catch (err) {
-    // Pass through our own typed error — it'll be translated to a
-    // not_found result by the Server Action.
-    if (err instanceof ListingsNotFoundError) {
-      throw err;
-    }
 
-    const msg = err instanceof Error ? err.message : String(err);
-    log("live-error", query, { error: msg, synthetic });
-
-    if (synthetic) {
-      // Real upstream failure for a user-supplied query. Bubble
-      // the original error so the dashboard shows a real error
-      // banner, not invented data.
-      throw err;
-    }
-
-    // Catalogued product + live failure → degrade to mock so the
-    // demo keeps working through transient outages.
-    return mockListingsFor(product);
+    if (filtered.length > best.length) best = filtered;
+    if (filtered.length >= MIN_RELEVANT_LISTINGS) return filtered;
   }
+
+  if (best.length > 0) return best;
+  throw new ListingsNotFoundError(lastQuery);
 }
 
 /**
@@ -150,19 +174,33 @@ function mockListingsFor(product: IdentifiedProduct): SoldListing[] {
   return generateSoldListings(recipe, seed);
 }
 
+/** Low-ticket mock recipe for unknown barcode scans in offline mode. */
+const CONSUMABLE_MOCK_RECIPE = {
+  basePrice: 8,
+  spread: 5,
+  count: 16,
+  boxRate: 0.1,
+  outliers: 1,
+} as const;
+
 function recipeFor(product: IdentifiedProduct) {
-  // Preferred: resolve straight from the catalogue id. This is
-  // the reliable path for products the user picked from a
-  // disambiguation list (we already know exactly which variant).
   const byId = findMockProductById(product.id);
   if (byId) return byId.listingRecipe;
 
-  if (product.upc) {
-    return findMockProductByBarcode(product.upc).listingRecipe;
+  // Unknown UPC scans in mock mode — avoid the old generic ~$75
+  // recipe that made water and snacks look like electronics.
+  if (product.source === "barcode" && product.id.startsWith("upc-")) {
+    return CONSUMABLE_MOCK_RECIPE;
   }
-  // Last-ditch fallbacks for synthetic products in mock-mode.
-  // (Live mode never reaches here because `getSoldListings`
-  // short-circuits synthetic + non-success above.)
+
+  if (product.upc) {
+    const byBarcode = findMockProductByBarcode(product.upc);
+    if (byBarcode.product.id !== "generic-item") {
+      return byBarcode.listingRecipe;
+    }
+    return CONSUMABLE_MOCK_RECIPE;
+  }
+
   const byTitle = findMockProductByQuery(product.title);
   if (byTitle.product.id !== "generic-item") return byTitle.listingRecipe;
   return findMockProductByImage(product.id).listingRecipe;
