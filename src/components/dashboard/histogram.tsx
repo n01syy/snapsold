@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRef, useState } from "react";
 import type { PriceBucket } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ const CURSOR_OFFSET = 14;
 
 export function Histogram({ buckets, recommendedBucket }: HistogramProps) {
   const chartRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
   const [hover, setHover] = useState<{
     idx: number;
     x: number;
@@ -92,23 +93,32 @@ export function Histogram({ buckets, recommendedBucket }: HistogramProps) {
           const isRecommended = b.bucket === recommendedBucket;
           const isHovered = hover?.idx === i;
           return (
-            <motion.div
+            <div
               key={b.bucket + "-" + i}
-              initial={{ height: 0 }}
-              animate={{ height: `${heightPct}%` }}
-              transition={{
-                duration: 0.6,
-                delay: 0.05 + i * 0.04,
-                ease: "easeOut",
-              }}
-              className={cn(
-                "flex-1 rounded-t transition-colors",
-                isRecommended ? "bg-tomato" : "bg-sandy/30",
-                isHovered &&
-                  (isRecommended ? "bg-tomato/90" : "bg-sandy/55"),
-              )}
-              aria-label={`${b.count} sold at $${b.bucket}`}
-            />
+              className="flex h-full flex-1 flex-col justify-end"
+            >
+              <motion.div
+                initial={reducedMotion ? false : { scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{
+                  duration: 0.45,
+                  delay: reducedMotion ? 0 : 0.03 + i * 0.025,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                style={{
+                  height: `${heightPct}%`,
+                  transformOrigin: "bottom",
+                  willChange: reducedMotion ? undefined : "transform",
+                }}
+                className={cn(
+                  "w-full rounded-t transition-colors",
+                  isRecommended ? "bg-tomato" : "bg-sandy/30",
+                  isHovered &&
+                    (isRecommended ? "bg-tomato/90" : "bg-sandy/55"),
+                )}
+                aria-label={`${b.count} sold at $${b.bucket}`}
+              />
+            </div>
           );
         })}
 

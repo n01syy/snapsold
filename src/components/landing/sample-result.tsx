@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import {
   ArrowUp,
   CheckCircle2,
@@ -11,28 +11,23 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import {
+  AnimatedNetCell,
+  AnimatedPriceTile,
+  cardEntrance,
+  EASE_OUT,
+  fadeUp,
+  stagger,
+} from "@/components/dashboard/analysis-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Histogram } from "@/components/dashboard/histogram";
 import { ListingHandoff } from "@/components/dashboard/listing-handoff";
-import { PriceTile } from "@/components/dashboard/price-tile";
 import { DEFAULT_FIXED_FEE, DEFAULT_FVF_RATE, computeNet } from "@/lib/fees";
 import type { PriceBucket } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-/**
- * Marketing preview that mirrors the live dashboard analysis card.
- * Reuses the real `Histogram` + `PriceTile` components so the
- * promise on the landing page stays in lock-step with what users
- * actually see post-upload — when those components evolve, the
- * preview follows for free.
- *
- * All numbers below are hand-tuned static demo data shaped like the
- * production `PriceAnalysis` output. If you change the schema, this
- * file needs a matching pass so the marketing copy doesn't lie.
- */
 
 const DEMO_PRODUCT = {
   title: "Nintendo Switch OLED — White (HEG-001) — Boxed, Excellent",
@@ -99,6 +94,14 @@ export function SampleResult() {
   const [selectedCondition, setSelectedCondition] = useState<string | null>(
     null,
   );
+  const [showChart, setShowChart] = useState(false);
+  const chartAnchorRef = useRef<HTMLDivElement>(null);
+  const chartInView = useInView(chartAnchorRef, { once: true, margin: "-60px" });
+  const reducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (chartInView) setShowChart(true);
+  }, [chartInView]);
 
   const copyTitle = async () => {
     try {
@@ -110,11 +113,6 @@ export function SampleResult() {
     }
   };
 
-  /**
-   * Static-data analogue of the dashboard's condition-bias logic
-   * (see {@link AnalysisView}). Same ratio scaling so the demo
-   * accurately previews the live interactivity.
-   */
   const adjustedPrices = useMemo(() => {
     if (!selectedCondition) return DEMO.prices;
     const row = DEMO.conditionBreakdown.find(
@@ -133,10 +131,49 @@ export function SampleResult() {
     DEMO_PRODUCT.searchQuery,
   )}&LH_Sold=1&LH_Complete=1`;
 
+  const badges = [
+    {
+      key: "match",
+      className: "border border-navy/30 bg-navy/5 text-navy",
+      icon: <CheckCircle2 className="mr-1 h-3 w-3" />,
+      label: `${Math.round(DEMO.matchConfidence * 100)}% match`,
+    },
+    {
+      key: "demand",
+      className: "border border-tomato/30 bg-tomato/10 text-tomato",
+      icon: <Flame className="mr-1 h-3 w-3" />,
+      label: `${DEMO.demand} demand · ${DEMO.perDayLabel}`,
+    },
+    {
+      key: "trend",
+      className: "border border-navy/30 bg-navy/5 text-navy",
+      icon: <ArrowUp className="mr-1 h-3 w-3" />,
+      label: `${DEMO.trendPct}% 7d`,
+    },
+    {
+      key: "sold",
+      className: "border border-border/60",
+      icon: null,
+      label: `${DEMO.sampleSize} sold · ${DEMO.windowDays}d`,
+    },
+    {
+      key: "outliers",
+      className: "border border-border/60",
+      icon: null,
+      label: `${DEMO.outliersRemoved} outliers filtered`,
+    },
+  ];
+
   return (
     <section id="preview" className="relative py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
+        <motion.div
+          initial={reducedMotion ? false : { opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: EASE_OUT }}
+          className="mx-auto max-w-2xl text-center"
+        >
           <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
             One photo. Three prices. Zero guesswork.
           </h2>
@@ -145,10 +182,9 @@ export function SampleResult() {
             {DEMO.sampleSize} recent eBay sold listings. Tap a condition to see
             the prices shift, or skip straight to a listing draft.
           </p>
-        </div>
+        </motion.div>
 
         <div className="relative mx-auto mt-14 min-w-0 max-w-5xl overflow-x-clip">
-          {/* Soft warm halo behind card — gold + tomato sunset */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10 opacity-60 blur-3xl sm:-inset-x-8 sm:-inset-y-8"
@@ -158,195 +194,236 @@ export function SampleResult() {
             }}
           />
 
-          <Card className="overflow-hidden border-border/60 bg-card p-0 glow-ring">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
-            >
-              {/* LEFT — identification + badges + prices + conditions + title */}
-              <div className="min-w-0 border-border/60 p-4 sm:p-6 lg:border-r lg:p-8">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Sparkles className="h-3.5 w-3.5 text-tomato" />
-                  AI-identified from photo
-                </div>
-                <h3 className="mt-2 text-lg font-semibold leading-snug tracking-tight">
-                  {DEMO_PRODUCT.title}
-                </h3>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="border border-navy/30 bg-navy/5 text-navy"
+          <motion.div
+            variants={cardEntrance}
+            initial={reducedMotion ? false : "hidden"}
+            whileInView={reducedMotion ? undefined : "visible"}
+            viewport={{ once: true, margin: "-80px" }}
+          >
+            <Card className="overflow-hidden border-border/60 bg-card p-0 glow-ring">
+              <div className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                {/* LEFT */}
+                <motion.div
+                  variants={stagger}
+                  initial={reducedMotion ? false : "hidden"}
+                  whileInView={reducedMotion ? undefined : "visible"}
+                  viewport={{ once: true, margin: "-60px" }}
+                  className="min-w-0 border-border/60 p-4 sm:p-6 lg:border-r lg:p-8"
+                >
+                  <motion.div
+                    variants={fadeUp}
+                    className="flex items-center gap-2 text-xs text-muted-foreground"
                   >
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                    {Math.round(DEMO.matchConfidence * 100)}% match
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="border border-tomato/30 bg-tomato/10 text-tomato"
+                    <Sparkles className="h-3.5 w-3.5 text-tomato" />
+                    AI-identified from photo
+                  </motion.div>
+
+                  <motion.h3
+                    variants={fadeUp}
+                    className="mt-2 text-lg font-semibold leading-snug tracking-tight"
                   >
-                    <Flame className="mr-1 h-3 w-3" />
-                    {DEMO.demand} demand · {DEMO.perDayLabel}
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="border border-navy/30 bg-navy/5 text-navy"
-                    title={`Median $244 (n=22, first 7d) → $258 (n=25, last 7d)`}
+                    {DEMO_PRODUCT.title}
+                  </motion.h3>
+
+                  <motion.div
+                    variants={stagger}
+                    className="mt-4 flex flex-wrap items-center gap-2"
                   >
-                    <ArrowUp className="mr-1 h-3 w-3" />
-                    {DEMO.trendPct}% 7d
-                  </Badge>
-                  <Badge variant="secondary" className="border border-border/60">
-                    {DEMO.sampleSize} sold · {DEMO.windowDays}d
-                  </Badge>
-                  <Badge variant="secondary" className="border border-border/60">
-                    {DEMO.outliersRemoved} outliers filtered
-                  </Badge>
-                </div>
-
-                <div className="mt-7 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
-                  <PriceTile
-                    label="Quick"
-                    value={adjustedPrices.quick}
-                    sublabel="Sells in days"
-                    tone="muted"
-                  />
-                  <PriceTile
-                    label="Recommended"
-                    value={adjustedPrices.recommended}
-                    sublabel="Best balance"
-                    tone="brand"
-                  />
-                  <PriceTile
-                    label="Max"
-                    value={adjustedPrices.max}
-                    sublabel="Patient sellers"
-                    tone="muted"
-                  />
-                </div>
-
-                <DemoFeeRow prices={adjustedPrices} />
-
-                <DemoConditionPicker
-                  rows={DEMO.conditionBreakdown}
-                  overallMedian={DEMO.median}
-                  selected={selectedCondition}
-                  onSelect={setSelectedCondition}
-                />
-
-                <div className="mt-6">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Listing title
-                  </div>
-                  <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                    <div
-                      className="min-w-0 truncate rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-xs leading-relaxed text-navy sm:flex-1"
-                      title={DEMO_PRODUCT.title}
-                    >
-                      {DEMO_PRODUCT.title}
-                    </div>
-                    <div className="flex min-w-0 gap-2 sm:shrink-0">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={copyTitle}
-                        className="min-w-0 flex-1 gap-1.5 font-display font-semibold sm:flex-none"
-                        aria-live="polite"
-                      >
-                        <ClipboardCopy className="h-4 w-4" />
-                        {copied ? "Copied" : "Copy"}
-                      </Button>
-                      <ListingHandoff title={DEMO_PRODUCT.title} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT — histogram + reasoning + stats + recent sales */}
-              <div className="min-w-0 p-4 sm:p-6 lg:p-8">
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <TrendingUp className="h-4 w-4 text-tomato" />
-                    Sold price distribution
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    last {DEMO.windowDays} days
-                  </span>
-                </div>
-
-                <div className="mt-6">
-                  <Histogram
-                    buckets={DEMO_HISTOGRAM}
-                    recommendedBucket={DEMO.recommendedBucket}
-                  />
-                </div>
-
-                <p className="mt-5 rounded-lg border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-foreground">
-                    Why we recommend ${adjustedPrices.recommended}
-                    {selectedCondition ? ` for ${selectedCondition}` : ""}:
-                  </span>{" "}
-                  {DEMO.explanation}
-                </p>
-
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                  <Stat label="Median" value={`$${DEMO.median}`} />
-                  <Stat label="Mean" value={`$${DEMO.mean}`} />
-                  <Stat label="IQR" value={`$${DEMO.iqr}`} />
-                  <Stat
-                    label="Confidence"
-                    value={`${Math.round(DEMO.pricingConfidence * 100)}%`}
-                  />
-                </dl>
-
-                <div className="mt-5">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Recent sold listings
-                    </div>
-                    <a
-                      href={allSoldUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-tomato hover:underline"
-                    >
-                      See all on eBay
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                  <ul className="mt-2 space-y-1.5">
-                    {DEMO.recentSales.map((s, i) => (
-                      <li key={`${s.title}-${i}`}>
-                        <a
-                          href={allSoldUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 transition-colors hover:border-tomato/40 hover:bg-tomato/5"
-                          title={s.title}
-                        >
-                          <span className="w-12 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-navy">
-                            ${s.price}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-xs text-foreground">
-                            {s.title}
-                          </span>
-                          <span className="hidden shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
-                            {s.condition}
-                          </span>
-                          <span className="shrink-0 text-[10px] text-muted-foreground">
-                            {s.ago}
-                          </span>
-                        </a>
-                      </li>
+                    {badges.map((badge) => (
+                      <motion.div key={badge.key} variants={fadeUp}>
+                        <Badge variant="secondary" className={badge.className}>
+                          {badge.icon}
+                          {badge.label}
+                        </Badge>
+                      </motion.div>
                     ))}
-                  </ul>
-                </div>
+                  </motion.div>
+
+                  <motion.div
+                    variants={stagger}
+                    className="mt-7 grid min-w-0 grid-cols-3 gap-2 sm:gap-3"
+                  >
+                    <AnimatedPriceTile
+                      label="Quick"
+                      value={adjustedPrices.quick}
+                      sublabel="Sells in days"
+                      tone="muted"
+                      index={0}
+                      animateOnMount
+                    />
+                    <AnimatedPriceTile
+                      label="Recommended"
+                      value={adjustedPrices.recommended}
+                      sublabel="Best balance"
+                      tone="brand"
+                      index={1}
+                      animateOnMount
+                    />
+                    <AnimatedPriceTile
+                      label="Max"
+                      value={adjustedPrices.max}
+                      sublabel="Patient sellers"
+                      tone="muted"
+                      index={2}
+                      animateOnMount
+                    />
+                  </motion.div>
+
+                  <motion.div variants={fadeUp}>
+                    <DemoFeeRow prices={adjustedPrices} />
+                  </motion.div>
+
+                  <motion.div variants={fadeUp}>
+                    <DemoConditionPicker
+                      rows={DEMO.conditionBreakdown}
+                      overallMedian={DEMO.median}
+                      selected={selectedCondition}
+                      onSelect={setSelectedCondition}
+                    />
+                  </motion.div>
+
+                  <motion.div variants={fadeUp} className="mt-6">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Listing title
+                    </div>
+                    <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <div
+                        className="min-w-0 truncate rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-xs leading-relaxed text-navy sm:flex-1"
+                        title={DEMO_PRODUCT.title}
+                      >
+                        {DEMO_PRODUCT.title}
+                      </div>
+                      <div className="flex min-w-0 gap-2 sm:shrink-0">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={copyTitle}
+                          className="min-w-0 flex-1 gap-1.5 font-display font-semibold sm:flex-none"
+                          aria-live="polite"
+                        >
+                          <ClipboardCopy className="h-4 w-4" />
+                          {copied ? "Copied" : "Copy"}
+                        </Button>
+                        <ListingHandoff title={DEMO_PRODUCT.title} />
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+
+                {/* RIGHT */}
+                <motion.div
+                  variants={stagger}
+                  initial={reducedMotion ? false : "hidden"}
+                  whileInView={reducedMotion ? undefined : "visible"}
+                  viewport={{ once: true, margin: "-60px" }}
+                  className="min-w-0 p-4 sm:p-6 lg:p-8"
+                >
+                  <motion.div
+                    variants={fadeUp}
+                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
+                  >
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <TrendingUp className="h-4 w-4 text-tomato" />
+                      Sold price distribution
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      last {DEMO.windowDays} days
+                    </span>
+                  </motion.div>
+
+                  <motion.div ref={chartAnchorRef} variants={fadeUp} className="mt-6">
+                    {showChart && (
+                      <Histogram
+                        buckets={DEMO_HISTOGRAM}
+                        recommendedBucket={DEMO.recommendedBucket}
+                      />
+                    )}
+                  </motion.div>
+
+                  <motion.p
+                    variants={fadeUp}
+                    className="mt-5 rounded-lg border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground"
+                  >
+                    <span className="font-semibold text-foreground">
+                      Why we recommend ${adjustedPrices.recommended}
+                      {selectedCondition ? ` for ${selectedCondition}` : ""}:
+                    </span>{" "}
+                    {DEMO.explanation}
+                  </motion.p>
+
+                  <motion.dl
+                    variants={stagger}
+                    className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"
+                  >
+                    {[
+                      { label: "Median", value: `$${DEMO.median}` },
+                      { label: "Mean", value: `$${DEMO.mean}` },
+                      { label: "IQR", value: `$${DEMO.iqr}` },
+                      {
+                        label: "Confidence",
+                        value: `${Math.round(DEMO.pricingConfidence * 100)}%`,
+                      },
+                    ].map((stat) => (
+                      <motion.div key={stat.label} variants={fadeUp}>
+                        <Stat label={stat.label} value={stat.value} />
+                      </motion.div>
+                    ))}
+                  </motion.dl>
+
+                  <motion.div variants={fadeUp} className="mt-5">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Recent sold listings
+                      </div>
+                      <a
+                        href={allSoldUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-tomato hover:underline"
+                      >
+                        See all on eBay
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                    <motion.ul
+                      variants={stagger}
+                      className="mt-2 space-y-1.5"
+                    >
+                      {DEMO.recentSales.map((s, i) => (
+                        <motion.li key={`${s.title}-${i}`} variants={fadeUp}>
+                          <motion.a
+                            href={allSoldUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            whileHover={
+                              reducedMotion
+                                ? undefined
+                                : { x: 4, transition: { duration: 0.18, ease: EASE_OUT } }
+                            }
+                            className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 transition-colors hover:border-tomato/40 hover:bg-tomato/5"
+                            title={s.title}
+                          >
+                            <span className="w-12 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-navy">
+                              ${s.price}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+                              {s.title}
+                            </span>
+                            <span className="hidden shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
+                              {s.condition}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                              {s.ago}
+                            </span>
+                          </motion.a>
+                        </motion.li>
+                      ))}
+                    </motion.ul>
+                  </motion.div>
+                </motion.div>
               </div>
-            </motion.div>
-          </Card>
+            </Card>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -364,18 +441,6 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * Demo-only condition picker.
- *
- * Mirrors {@link AnalysisView}'s `ConditionPicker` exactly so the
- * landing page faithfully previews the interactivity visitors get
- * post-upload. Kept inline here (rather than promoted to a shared
- * component) because the marketing copy uses static, display-
- * ready strings for `condition` while the dashboard works with
- * the engine's typed enum — collapsing both into one component
- * would mean leaking the SoldListing union into the marketing
- * data model for no real win.
- */
 function DemoConditionPicker({
   rows,
   overallMedian,
@@ -387,6 +452,8 @@ function DemoConditionPicker({
   selected: string | null;
   onSelect: (c: string | null) => void;
 }) {
+  const reducedMotion = useReducedMotion();
+
   return (
     <div className="mt-5">
       <div className="flex items-center justify-between gap-2">
@@ -404,18 +471,30 @@ function DemoConditionPicker({
         )}
       </div>
       <ul className="mt-2 space-y-1.5">
-        {rows.map((r) => {
+        {rows.map((r, i) => {
           const isActive = selected === r.condition;
           const delta =
             overallMedian > 0
               ? Math.round(((r.median - overallMedian) / overallMedian) * 100)
               : 0;
           return (
-            <li key={r.condition}>
-              <button
+            <motion.li
+              key={r.condition}
+              initial={reducedMotion ? false : { opacity: 0, x: -12 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-20px" }}
+              transition={{ delay: 0.08 * i, duration: 0.4, ease: EASE_OUT }}
+            >
+              <motion.button
                 type="button"
                 onClick={() => onSelect(isActive ? null : r.condition)}
                 aria-pressed={isActive}
+                whileHover={
+                  reducedMotion
+                    ? undefined
+                    : { scale: 1.01, transition: { duration: 0.15, ease: EASE_OUT } }
+                }
+                whileTap={reducedMotion ? undefined : { scale: 0.99 }}
                 className={cn(
                   "flex w-full flex-col gap-1 rounded-lg border px-3 py-1.5 text-left transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-3",
                   isActive
@@ -443,27 +522,27 @@ function DemoConditionPicker({
                     · {r.count}
                   </span>
                 </span>
-              </button>
-            </li>
+              </motion.button>
+            </motion.li>
           );
         })}
       </ul>
       {selected && (
-        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+        <motion.p
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mt-2 overflow-hidden text-[10px] leading-relaxed text-muted-foreground"
+        >
           Prices above are scaled for{" "}
           <span className="font-semibold text-foreground">{selected}</span> —
           biased from the overall median (${overallMedian}) by this
           condition&apos;s sample.
-        </p>
+        </motion.p>
       )}
     </div>
   );
 }
 
-/**
- * Demo-only "After eBay fees" strip — same shape as the dashboard
- * `FeeRow` but inlined for the marketing component.
- */
 function DemoFeeRow({
   prices,
 }: {
@@ -473,6 +552,7 @@ function DemoFeeRow({
   const r = computeNet(prices.recommended);
   const m = computeNet(prices.max);
   const rateLabel = `~${Math.round(DEFAULT_FVF_RATE * 1000) / 10}% + $${DEFAULT_FIXED_FEE.toFixed(2)}`;
+
   return (
     <div className="mt-3 rounded-xl border border-border/60 bg-muted/20 p-2.5 sm:p-3">
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
@@ -488,45 +568,10 @@ function DemoFeeRow({
         </span>
       </div>
       <dl className="mt-2 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
-        <DemoNetCell label="Quick net" net={q.net} />
-        <DemoNetCell label="Recommended net" net={r.net} highlight />
-        <DemoNetCell label="Max net" net={m.net} />
+        <AnimatedNetCell label="Quick net" net={q.net} delay={0.2} />
+        <AnimatedNetCell label="Recommended net" net={r.net} highlight delay={0.28} />
+        <AnimatedNetCell label="Max net" net={m.net} delay={0.36} />
       </dl>
-    </div>
-  );
-}
-
-function DemoNetCell({
-  label,
-  net,
-  highlight,
-}: {
-  label: string;
-  net: number;
-  highlight?: boolean;
-}) {
-  const shortLabel =
-    label === "Recommended net"
-      ? "Rec."
-      : label === "Quick net"
-        ? "Quick"
-        : label === "Max net"
-          ? "Max"
-          : label;
-  return (
-    <div className="min-w-0">
-      <dt className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-        <span className="sm:hidden">{shortLabel}</span>
-        <span className="hidden sm:inline">{label}</span>
-      </dt>
-      <dd
-        className={cn(
-          "mt-0.5 text-sm font-bold leading-none tracking-tight tabular-nums sm:text-base",
-          highlight && "text-tomato",
-        )}
-      >
-        ${Math.round(net)}
-      </dd>
     </div>
   );
 }

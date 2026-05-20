@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { EASE_OUT } from "@/components/dashboard/analysis-motion";
 import dynamic from "next/dynamic";
 import { Camera, ImageUp, Loader2, ScanBarcode, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,11 @@ export function HeroDropzone() {
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const reducedMotion = useReducedMotion();
+
+  const panelTransition = reducedMotion
+    ? { duration: 0.01 }
+    : { duration: 0.22, ease: EASE_OUT };
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -84,7 +90,7 @@ export function HeroDropzone() {
       <div
         role="tablist"
         aria-label="Search method"
-        className="mb-4 flex w-full items-center gap-1 rounded-xl border border-border/60 bg-card/70 p-1 backdrop-blur"
+        className="relative mb-4 flex w-full items-center gap-1 rounded-xl border border-border/60 bg-card/80 p-1 shadow-sm shadow-navy/5"
       >
         <ModeTab active={mode === "image"} onClick={() => setMode("image")} icon={<ImageUp className="h-4 w-4" />}>
           Photo
@@ -103,8 +109,8 @@ export function HeroDropzone() {
             key="image"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={panelTransition}
           >
             <div
               onDragOver={(e) => {
@@ -124,7 +130,7 @@ export function HeroDropzone() {
                 if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
               }}
               className={cn(
-                "group relative grid h-56 w-full cursor-pointer place-items-center overflow-hidden rounded-2xl border-2 border-dashed bg-card/60 backdrop-blur transition-all",
+                "group relative grid h-56 w-full cursor-pointer place-items-center overflow-hidden rounded-2xl border-2 border-dashed bg-card/70 shadow-md shadow-navy/8 transition-colors glow-ring",
                 isDragging
                   ? "scale-[1.01] border-tomato bg-tomato/10"
                   : "border-navy/25 hover:border-tomato/60 hover:bg-card/80",
@@ -169,9 +175,9 @@ export function HeroDropzone() {
             onSubmit={handleSubmit}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
-            className="flex w-full items-center gap-2 rounded-2xl border border-border/60 bg-card/70 p-2 backdrop-blur focus-within:border-tomato/60"
+            exit={{ opacity: 0, y: -6 }}
+            transition={panelTransition}
+            className="flex w-full items-center gap-2 rounded-2xl border border-border/60 bg-card/80 p-2 shadow-md shadow-navy/8 focus-within:border-tomato/60 focus-within:ring-2 focus-within:ring-tomato/15"
           >
             <Search className="ml-3 h-5 w-5 shrink-0 text-muted-foreground" />
             <input
@@ -196,9 +202,9 @@ export function HeroDropzone() {
             onSubmit={handleBarcodeSubmit}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
-            className="rounded-2xl border border-border/60 bg-card/60 p-4 backdrop-blur"
+            exit={{ opacity: 0, y: -6 }}
+            transition={panelTransition}
+            className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-md shadow-navy/8"
           >
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-2">
@@ -279,14 +285,21 @@ function ModeTab({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-        active
-          ? "bg-background text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
+        "relative z-10 flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200",
+        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
       )}
     >
-      {icon}
-      {children}
+      {active && (
+        <motion.span
+          layoutId="hero-tab-pill"
+          className="absolute inset-0 rounded-lg border border-tomato/20 bg-background shadow-sm"
+          transition={{ duration: 0.22, ease: EASE_OUT }}
+        />
+      )}
+      <span className="relative z-10 flex items-center gap-2">
+        {icon}
+        {children}
+      </span>
     </button>
   );
 }

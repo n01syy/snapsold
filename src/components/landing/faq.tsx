@@ -1,7 +1,8 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
+import { EASE_OUT } from "@/components/dashboard/analysis-motion";
 import { cn } from "@/lib/utils";
 
 interface FaqItem {
@@ -189,15 +190,16 @@ function FaqRow({
   onToggle: () => void;
   index: number;
 }) {
+  const reducedMotion = useReducedMotion();
   const panelId = `${item.id}-panel`;
   const buttonId = `${item.id}-button`;
 
   return (
     <motion.li
-      initial={{ opacity: 0, y: 10 }}
+      initial={reducedMotion ? false : { opacity: 0, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.35, delay: index * 0.04, ease: "easeOut" }}
+      transition={{ duration: 0.3, delay: index * 0.03, ease: EASE_OUT }}
       className={cn(
         "overflow-hidden rounded-xl border bg-card transition-colors duration-200",
         open
@@ -231,7 +233,7 @@ function FaqRow({
             <span className="absolute left-0 right-0 top-1/2 h-[2px] -translate-y-1/2 rounded bg-current" />
             <motion.span
               animate={{ rotate: open ? 90 : 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              transition={{ duration: 0.2, ease: EASE_OUT }}
               className="absolute bottom-0 left-1/2 top-0 w-[2px] -translate-x-1/2 rounded bg-current"
             />
           </span>

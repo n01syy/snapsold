@@ -1,6 +1,9 @@
 "use client";
 
-import { motion } from "motion/react";
+import {
+  motion,
+  useReducedMotion,
+} from "motion/react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -15,13 +18,19 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AnimatedNetCell,
+  AnimatedPriceTile,
+  cardEntrance,
+  fadeUp,
+  stagger,
+} from "@/components/dashboard/analysis-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Histogram } from "@/components/dashboard/histogram";
 import { ListingHandoff } from "@/components/dashboard/listing-handoff";
-import { PriceTile } from "@/components/dashboard/price-tile";
 import { DEFAULT_FIXED_FEE, DEFAULT_FVF_RATE, computeNet } from "@/lib/fees";
 import type {
   ConditionPrice,
@@ -51,6 +60,10 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
   const [selectedCondition, setSelectedCondition] = useState<
     SoldListing["condition"] | null
   >(null);
+
+  useEffect(() => {
+    setSelectedCondition(null);
+  }, [product.id]);
 
   const copyTitle = async () => {
     try {
@@ -97,6 +110,9 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
     };
   }, [analysis, selectedCondition]);
 
+  const reducedMotion = useReducedMotion();
+  const resultKey = `${product.id}-${analysis.sampleSize}-${analysis.recommendedBucket}`;
+
   return (
     <div className="relative min-w-0 overflow-x-clip">
       <div
@@ -108,169 +124,217 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
         }}
       />
 
-      <Card className="overflow-hidden border-border/60 bg-card p-0 glow-ring">
-        {/*
-          The "too broad" banner only makes sense for text searches.
-          When the user submitted a photo (or a barcode), they didn't
-          *type* anything they could refine — the search query came
-          from vision/UPC lookup, so prompting them to "add Series X"
-          or "add 256GB" would be confusing and off-base. Suppress.
-        */}
-        {analysis.isBroad && product.source === "name" && (
-          <BroadQueryBanner product={product} analysis={analysis} />
-        )}
+      <motion.div
+        key={resultKey}
+        variants={cardEntrance}
+        initial={reducedMotion ? false : "hidden"}
+        animate="visible"
+      >
+        <Card className="overflow-hidden border-border/60 bg-card p-0 glow-ring">
+          {analysis.isBroad && product.source === "name" && (
+            <BroadQueryBanner product={product} analysis={analysis} />
+          )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
-        >
-          {/* LEFT — identification + prices */}
-          <div className="min-w-0 border-border/60 p-4 sm:p-6 lg:border-r lg:p-8">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5 text-tomato" />
-              {product.source === "image"
-                ? "AI-identified from photo"
-                : product.source === "barcode"
-                  ? "Matched to UPC"
-                  : "Matched to your query"}
-            </div>
-            <h3 className="mt-2 text-lg font-semibold leading-snug tracking-tight">
-              {product.title}
-            </h3>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <MatchBadge confidence={product.confidence} />
-              <DemandBadge
-                demand={analysis.demand}
-                perDay={analysis.perDay}
-              />
-              {analysis.trend && <TrendBadge trend={analysis.trend} />}
-              <Badge variant="secondary" className="border border-border/60">
-                {analysis.sampleSize} sold · {analysis.windowDays}d
-              </Badge>
-              {analysis.outliersRemoved > 0 && (
-                <Badge variant="secondary" className="border border-border/60">
-                  {analysis.outliersRemoved} outlier
-                  {analysis.outliersRemoved === 1 ? "" : "s"} filtered
-                </Badge>
-              )}
-            </div>
-
-            <div className="mt-7 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
-              <PriceTile
-                label="Quick"
-                value={adjustedPrices.quick}
-                sublabel={quickSubtitle(analysis.perDay)}
-                tone="muted"
-              />
-              <PriceTile
-                label="Recommended"
-                value={adjustedPrices.recommended}
-                sublabel="Best balance"
-                tone="brand"
-              />
-              <PriceTile
-                label="Max"
-                value={adjustedPrices.max}
-                sublabel={maxSubtitle(analysis.perDay)}
-                tone="muted"
-              />
-            </div>
-
-            <FeeRow prices={adjustedPrices} />
-
-            {analysis.conditionBreakdown.length >= 2 && (
-              <ConditionPicker
-                rows={analysis.conditionBreakdown}
-                overallMedian={analysis.median}
-                selected={selectedCondition}
-                onSelect={setSelectedCondition}
-              />
-            )}
-
-            <div className="mt-6">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Listing title
-              </div>
-              <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                <div
-                  className="min-w-0 truncate rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-xs leading-relaxed text-navy sm:flex-1"
-                  title={product.title}
-                >
-                  {product.title}
-                </div>
-                <div className="flex min-w-0 gap-2 sm:shrink-0">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={copyTitle}
-                    className="min-w-0 flex-1 gap-1.5 font-display font-semibold sm:flex-none"
-                    aria-live="polite"
-                  >
-                    <ClipboardCopy className="h-4 w-4" />
-                    {copied ? "Copied" : "Copy"}
-                  </Button>
-                  <ListingHandoff title={product.title} />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onReset}
-                className="gap-2 font-display font-semibold"
+          <div className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            {/* LEFT */}
+            <motion.div
+              variants={stagger}
+              initial={reducedMotion ? false : "hidden"}
+              animate={reducedMotion ? undefined : "visible"}
+              className="min-w-0 border-border/60 p-4 sm:p-6 lg:border-r lg:p-8"
+            >
+              <motion.div
+                variants={fadeUp}
+                className="flex items-center gap-2 text-xs text-muted-foreground"
               >
-                <RotateCcw className="h-4 w-4" />
-                New analysis
-              </Button>
-            </div>
+                <Sparkles className="h-3.5 w-3.5 text-tomato" />
+                {product.source === "image"
+                  ? "AI-identified from photo"
+                  : product.source === "barcode"
+                    ? "Matched to UPC"
+                    : "Matched to your query"}
+              </motion.div>
+
+              <motion.h3
+                variants={fadeUp}
+                className="mt-2 text-lg font-semibold leading-snug tracking-tight"
+              >
+                {product.title}
+              </motion.h3>
+
+              <motion.div
+                variants={stagger}
+                className="mt-4 flex flex-wrap items-center gap-2"
+              >
+                <motion.div variants={fadeUp}>
+                  <MatchBadge confidence={product.confidence} />
+                </motion.div>
+                <motion.div variants={fadeUp}>
+                  <DemandBadge
+                    demand={analysis.demand}
+                    perDay={analysis.perDay}
+                  />
+                </motion.div>
+                {analysis.trend && (
+                  <motion.div variants={fadeUp}>
+                    <TrendBadge trend={analysis.trend} />
+                  </motion.div>
+                )}
+                <motion.div variants={fadeUp}>
+                  <Badge variant="secondary" className="border border-border/60">
+                    {analysis.sampleSize} sold · {analysis.windowDays}d
+                  </Badge>
+                </motion.div>
+                {analysis.outliersRemoved > 0 && (
+                  <motion.div variants={fadeUp}>
+                    <Badge variant="secondary" className="border border-border/60">
+                      {analysis.outliersRemoved} outlier
+                      {analysis.outliersRemoved === 1 ? "" : "s"} filtered
+                    </Badge>
+                  </motion.div>
+                )}
+              </motion.div>
+
+              <motion.div
+                key={`prices-${resultKey}`}
+                variants={stagger}
+                className="mt-7 grid min-w-0 grid-cols-3 gap-2 sm:gap-3"
+              >
+                <AnimatedPriceTile
+                  label="Quick"
+                  value={adjustedPrices.quick}
+                  sublabel={quickSubtitle(analysis.perDay)}
+                  tone="muted"
+                  index={0}
+                />
+                <AnimatedPriceTile
+                  label="Recommended"
+                  value={adjustedPrices.recommended}
+                  sublabel="Best balance"
+                  tone="brand"
+                  index={1}
+                />
+                <AnimatedPriceTile
+                  label="Max"
+                  value={adjustedPrices.max}
+                  sublabel={maxSubtitle(analysis.perDay)}
+                  tone="muted"
+                  index={2}
+                />
+              </motion.div>
+
+              <motion.div key={`fees-${resultKey}`} variants={fadeUp}>
+                <FeeRow prices={adjustedPrices} />
+              </motion.div>
+
+              {analysis.conditionBreakdown.length >= 2 && (
+                <motion.div variants={fadeUp}>
+                  <ConditionPicker
+                    rows={analysis.conditionBreakdown}
+                    overallMedian={analysis.median}
+                    selected={selectedCondition}
+                    onSelect={setSelectedCondition}
+                  />
+                </motion.div>
+              )}
+
+              <motion.div variants={fadeUp} className="mt-6">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Listing title
+                </div>
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <div
+                    className="min-w-0 truncate rounded-lg border border-border/60 bg-muted/30 px-3 py-2 font-mono text-xs leading-relaxed text-navy sm:flex-1"
+                    title={product.title}
+                  >
+                    {product.title}
+                  </div>
+                  <div className="flex min-w-0 gap-2 sm:shrink-0">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={copyTitle}
+                      className="min-w-0 flex-1 gap-1.5 font-display font-semibold sm:flex-none"
+                      aria-live="polite"
+                    >
+                      <ClipboardCopy className="h-4 w-4" />
+                      {copied ? "Copied" : "Copy"}
+                    </Button>
+                    <ListingHandoff title={product.title} />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                variants={fadeUp}
+                className="mt-4 flex flex-wrap items-center gap-2"
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onReset}
+                  className="gap-2 font-display font-semibold"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  New analysis
+                </Button>
+              </motion.div>
+            </motion.div>
+
+            {/* RIGHT */}
+            <motion.div
+              variants={stagger}
+              initial={reducedMotion ? false : "hidden"}
+              animate={reducedMotion ? undefined : "visible"}
+              className="min-w-0 p-4 sm:p-6 lg:p-8"
+            >
+              <motion.div
+                variants={fadeUp}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
+              >
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <TrendingUp className="h-4 w-4 text-tomato" />
+                  Sold price distribution
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  last {analysis.windowDays} days
+                </span>
+              </motion.div>
+
+              <motion.div variants={fadeUp} className="mt-6">
+                <Histogram
+                  key={resultKey}
+                  buckets={analysis.histogram}
+                  recommendedBucket={analysis.recommendedBucket}
+                />
+              </motion.div>
+
+              <motion.p
+                variants={fadeUp}
+                className="mt-5 rounded-lg border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground"
+              >
+                <span className="font-semibold text-foreground">
+                  Why we recommend ${adjustedPrices.recommended}
+                  {selectedCondition
+                    ? ` for ${prettyCondition(selectedCondition)}`
+                    : ""}
+                  :
+                </span>{" "}
+                {analysis.explanation}
+              </motion.p>
+
+              <StatsGrid analysis={analysis} />
+
+              {analysis.recentSales.length > 0 && (
+                <RecentSalesPanel
+                  sales={analysis.recentSales}
+                  searchQuery={product.searchQuery}
+                />
+              )}
+            </motion.div>
           </div>
-
-          {/* RIGHT — histogram + reasoning */}
-          <div className="min-w-0 p-4 sm:p-6 lg:p-8">
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <TrendingUp className="h-4 w-4 text-tomato" />
-                Sold price distribution
-              </div>
-              <span className="text-xs text-muted-foreground">
-                last {analysis.windowDays} days
-              </span>
-            </div>
-
-            <div className="mt-6">
-              <Histogram
-                buckets={analysis.histogram}
-                recommendedBucket={analysis.recommendedBucket}
-              />
-            </div>
-
-            <p className="mt-5 rounded-lg border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-              <span className="font-semibold text-foreground">
-                Why we recommend ${adjustedPrices.recommended}
-                {selectedCondition
-                  ? ` for ${prettyCondition(selectedCondition)}`
-                  : ""}
-                :
-              </span>{" "}
-              {analysis.explanation}
-            </p>
-
-            <StatsGrid analysis={analysis} />
-
-            {analysis.recentSales.length > 0 && (
-              <RecentSalesPanel
-                sales={analysis.recentSales}
-                searchQuery={product.searchQuery}
-              />
-            )}
-          </div>
-        </motion.div>
-      </Card>
+        </Card>
+      </motion.div>
     </div>
   );
 }
@@ -468,6 +532,8 @@ function ConditionPicker({
   selected: SoldListing["condition"] | null;
   onSelect: (c: SoldListing["condition"] | null) => void;
 }) {
+  const reducedMotion = useReducedMotion();
+
   return (
     <div className="mt-5">
       <div className="flex items-center justify-between gap-2">
@@ -493,10 +559,16 @@ function ConditionPicker({
               : 0;
           return (
             <li key={r.condition}>
-              <button
+              <motion.button
                 type="button"
                 onClick={() => onSelect(isActive ? null : r.condition)}
                 aria-pressed={isActive}
+                whileHover={
+                  reducedMotion
+                    ? undefined
+                    : { scale: 1.01, transition: { duration: 0.15 } }
+                }
+                whileTap={reducedMotion ? undefined : { scale: 0.99 }}
                 className={cn(
                   "flex w-full flex-col gap-1 rounded-lg border px-3 py-1.5 text-left transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-3",
                   isActive
@@ -524,20 +596,24 @@ function ConditionPicker({
                     · {r.count}
                   </span>
                 </span>
-              </button>
+              </motion.button>
             </li>
           );
         })}
       </ul>
       {selected && (
-        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+        <motion.p
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mt-2 overflow-hidden text-[10px] leading-relaxed text-muted-foreground"
+        >
           Prices above are scaled for{" "}
           <span className="font-semibold text-foreground">
             {prettyCondition(selected)}
           </span>{" "}
           — biased from the overall median (${overallMedian}) by this
           condition&apos;s sample.
-        </p>
+        </motion.p>
       )}
     </div>
   );
@@ -578,55 +654,14 @@ function FeeRow({
         </span>
       </div>
       <dl className="mt-2 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
-        <NetCell label="Quick net" net={q.net} />
-        <NetCell label="Recommended net" net={r.net} highlight />
-        <NetCell label="Max net" net={m.net} />
+        <AnimatedNetCell label="Quick net" net={q.net} delay={0.2} />
+        <AnimatedNetCell label="Recommended net" net={r.net} highlight delay={0.28} />
+        <AnimatedNetCell label="Max net" net={m.net} delay={0.36} />
       </dl>
     </div>
   );
 }
 
-function NetCell({
-  label,
-  net,
-  highlight,
-}: {
-  label: string;
-  net: number;
-  highlight?: boolean;
-}) {
-  const shortLabel =
-    label === "Recommended net"
-      ? "Rec."
-      : label === "Quick net"
-        ? "Quick"
-        : label === "Max net"
-          ? "Max"
-          : label;
-  return (
-    <div className="min-w-0">
-      <dt className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-        <span className="sm:hidden">{shortLabel}</span>
-        <span className="hidden sm:inline">{label}</span>
-      </dt>
-      <dd
-        className={cn(
-          "mt-0.5 text-sm font-bold leading-none tracking-tight tabular-nums sm:text-base",
-          highlight && "text-tomato",
-        )}
-      >
-        ${Math.round(net)}
-      </dd>
-    </div>
-  );
-}
-
-/**
- * Right-column "Recent sold listings" panel — three real eBay
- * sales drawn from the cleaned sample. Two purposes:
- *  1. Builds trust that the headline number reflects real data.
- *  2. The titles double as listing-title templates.
- */
 function RecentSalesPanel({
   sales,
   searchQuery,
@@ -638,7 +673,7 @@ function RecentSalesPanel({
     searchQuery,
   )}&LH_Sold=1&LH_Complete=1`;
   return (
-    <div className="mt-5">
+    <motion.div variants={fadeUp} className="mt-5">
       <div className="flex items-center justify-between">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Recent sold listings
@@ -653,16 +688,19 @@ function RecentSalesPanel({
           <ExternalLink className="h-3 w-3" />
         </a>
       </div>
-      <ul className="mt-2 space-y-1.5">
+      <motion.ul variants={stagger} className="mt-2 space-y-1.5">
         {sales.map((s, i) => (
-          <RecentSaleRow key={`${s.title}-${i}`} sale={s} />
+          <motion.li key={`${s.title}-${i}`} variants={fadeUp}>
+            <RecentSaleRow sale={s} />
+          </motion.li>
         ))}
-      </ul>
-    </div>
+      </motion.ul>
+    </motion.div>
   );
 }
 
 function RecentSaleRow({ sale }: { sale: RecentSale }) {
+  const reducedMotion = useReducedMotion();
   const ago = relativeTime(sale.soldAt);
   const inner = (
     <>
@@ -685,26 +723,29 @@ function RecentSaleRow({ sale }: { sale: RecentSale }) {
   // row layout doesn't shift when only some listings link out.
   if (!sale.url) {
     return (
-      <li
+      <div
         className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5"
         title={sale.title}
       >
         {inner}
-      </li>
+      </div>
     );
   }
   return (
-    <li>
-      <a
-        href={sale.url}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 transition-colors hover:border-tomato/40 hover:bg-tomato/5"
-        title={sale.title}
-      >
-        {inner}
-      </a>
-    </li>
+    <motion.a
+      href={sale.url}
+      target="_blank"
+      rel="noreferrer"
+      whileHover={
+        reducedMotion
+          ? undefined
+          : { x: 4, transition: { type: "spring", stiffness: 400, damping: 24 } }
+      }
+      className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 transition-colors hover:border-tomato/40 hover:bg-tomato/5"
+      title={sale.title}
+    >
+      {inner}
+    </motion.a>
   );
 }
 
@@ -719,8 +760,19 @@ function StatsGrid({ analysis }: { analysis: PriceAnalysis }) {
     Math.abs(analysis.mean - analysis.median) >
     Math.max(1, analysis.median * 0.03);
 
+  const stats = [
+    { label: "Median", value: `$${analysis.median}` },
+    ...(skewed ? [{ label: "Mean", value: `$${analysis.mean}` }] : []),
+    { label: "IQR", value: `$${analysis.iqr}` },
+    {
+      label: "Confidence",
+      value: `${Math.round(analysis.confidence * 100)}%`,
+    },
+  ];
+
   return (
-    <dl
+    <motion.dl
+      variants={stagger}
       className={cn(
         "mt-4 grid gap-3 text-xs",
         skewed
@@ -728,14 +780,12 @@ function StatsGrid({ analysis }: { analysis: PriceAnalysis }) {
           : "grid-cols-3 sm:grid-cols-3",
       )}
     >
-      <Stat label="Median" value={`$${analysis.median}`} />
-      {skewed && <Stat label="Mean" value={`$${analysis.mean}`} />}
-      <Stat label="IQR" value={`$${analysis.iqr}`} />
-      <Stat
-        label="Confidence"
-        value={`${Math.round(analysis.confidence * 100)}%`}
-      />
-    </dl>
+      {stats.map((stat) => (
+        <motion.div key={stat.label} variants={fadeUp}>
+          <Stat label={stat.label} value={stat.value} />
+        </motion.div>
+      ))}
+    </motion.dl>
   );
 }
 
