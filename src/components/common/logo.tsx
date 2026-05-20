@@ -3,35 +3,25 @@ import { cn } from "@/lib/utils";
 
 interface LogoProps {
   className?: string;
-  showWordmark?: boolean;
 }
 
 /**
- * Snapsold wordmark + glyph.
- *
- * Glyph is the brand mark from /public/snapsoldicon4.png. Rendered through next/image so the
- * optimizer serves an appropriately sized + retina-doubled variant for
- * the navbar without us shipping the full-resolution source on every load.
- * `priority` is set because the navbar is above the fold on every route.
+ * Snapsold wordmark banner for navbar, footer, and auth chrome.
+ * Source is 1000×250 (4:1) — height is capped to fit the nav bar;
+ * width scales automatically to preserve aspect ratio.
  */
-export function Logo({ className, showWordmark = true }: LogoProps) {
+export function Logo({ className }: LogoProps) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <Image
-        src="/snapsoldicon4.png"
-        // Decorative when the wordmark is present (the text already names
-        // the brand); descriptive when the glyph stands alone.
-        alt={showWordmark ? "" : "Snapsold"}
-        width={36}
-        height={36}
-        priority
-        className="h-9 w-9 select-none"
-      />
-      {showWordmark && (
-        <span className="font-display text-base font-bold tracking-tight sm:text-lg">
-          Snapsold
-        </span>
+    <Image
+      src="/snapsoldbanner.png"
+      alt="Snapsold"
+      width={1000}
+      height={250}
+      priority
+      className={cn(
+        "h-8 w-auto max-w-[10.5rem] select-none sm:h-9 sm:max-w-none",
+        className,
       )}
-    </div>
+    />
   );
 }

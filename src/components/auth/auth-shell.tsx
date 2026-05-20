@@ -27,7 +27,7 @@ export function AuthShell({ children }: AuthShellProps) {
           />
           <div className="mb-8 flex justify-center lg:hidden">
             <Link href="/" aria-label="Snapsold home">
-              <Logo showWordmark={false} />
+              <Logo />
             </Link>
           </div>
           {children}
