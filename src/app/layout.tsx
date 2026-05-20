@@ -36,8 +36,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Snapsold" }],
   icons: {
-    icon: [{ url: "/snapsoldicon2.png", type: "image/png" }],
-    apple: [{ url: "/snapsoldicon2.png", type: "image/png" }],
+    icon: [{ url: "/snapsoldicon3.png", type: "image/png" }],
+    apple: [{ url: "/snapsoldicon3.png", type: "image/png" }],
   },
   openGraph: {
     title: "Snapsold — AI resale pricing, in seconds",

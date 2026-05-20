@@ -9,7 +9,7 @@ interface LogoProps {
 /**
  * Snapsold wordmark + glyph.
  *
- * Glyph is the brand mark from /public/snapsoldicon2.png. Rendered through next/image so the
+ * Glyph is the brand mark from /public/snapsoldicon3.png. Rendered through next/image so the
  * optimizer serves an appropriately sized + retina-doubled variant for
  * the navbar without us shipping the full-resolution source on every load.
  * `priority` is set because the navbar is above the fold on every route.
@@ -18,7 +18,7 @@ export function Logo({ className, showWordmark = true }: LogoProps) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <Image
-        src="/snapsoldicon2.png"
+        src="/snapsoldicon3.png"
         // Decorative when the wordmark is present (the text already names
         // the brand); descriptive when the glyph stands alone.
         alt={showWordmark ? "" : "Snapsold"}
