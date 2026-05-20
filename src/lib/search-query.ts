@@ -1,4 +1,5 @@
 import type { IdentifiedProduct } from "./types";
+import { parseProductIdentity, significantTokens } from "./product-tokens";
 
 const STOP_WORDS = new Set([
   "and",
@@ -27,27 +28,43 @@ const STOP_WORDS = new Set([
   "per",
   "each",
   "pack",
+  "unlocked",
+  "locked",
+  "carrier",
+  "verizon",
+  "att",
+  "tmobile",
+  "excellent",
+  "good",
+  "mint",
+  "renewed",
+  "refurbished",
 ]);
 
 /**
  * Turn a long UPC-database title into a short, eBay-friendly query.
- * Keeps brand + the most distinctive product nouns, drops filler.
+ * Keeps brand + distinctive nouns, including 2-digit model numbers.
  */
 export function refineTitleForSearch(title: string, brand?: string): string {
-  const tokens = title
+  const rawTokens = title
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+    .filter(Boolean);
 
   const out: string[] = [];
   if (brand) {
     const b = brand.toLowerCase().trim();
     if (b.length >= 2 && !out.includes(b)) out.push(b);
   }
-  for (const t of tokens) {
-    if (!out.includes(t)) out.push(t);
-    if (out.length >= 5) break;
+
+  for (const w of rawTokens) {
+    if (STOP_WORDS.has(w)) continue;
+    const keep =
+      w.length >= 3 || /^\d{2}$/.test(w) || /^\d+(gb|tb)$/.test(w);
+    if (!keep) continue;
+    if (!out.includes(w)) out.push(w);
+    if (out.length >= 8) break;
   }
 
   const refined = out.join(" ").trim();
@@ -57,13 +74,15 @@ export function refineTitleForSearch(title: string, brand?: string): string {
 /**
  * Ordered eBay `_nkw` queries to try for a product.
  *
- * Barcode scans prefer the UPC digits first — eBay sellers almost
- * always include the code in title or item specifics, which avoids
- * matching unrelated items that share vague words ("water", "garden").
- * A refined title query is the fallback when the UPC search is thin.
+ * Text/image queries prefer the user's full phrase first so model
+ * numbers ("17") and storage ("256gb") aren't stripped before search.
  */
 export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
   const queries: string[] = [];
+  const push = (q: string) => {
+    const trimmed = q.trim();
+    if (trimmed && !queries.includes(trimmed)) queries.push(trimmed);
+  };
 
   if (product.source === "barcode") {
     const upc =
@@ -71,14 +90,41 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       (/^[0-9]{8,14}$/.test(product.searchQuery ?? "")
         ? product.searchQuery
         : undefined);
-    if (upc) queries.push(upc);
+    if (upc) push(upc);
 
     const refined = refineTitleForSearch(product.title, product.brand);
-    if (refined && refined !== upc) queries.push(refined);
+    if (refined && refined !== upc) push(refined);
     return queries.length > 0 ? queries : [product.title.trim()];
   }
 
   const raw = (product.searchQuery ?? product.title).trim();
   const refined = refineTitleForSearch(raw, product.brand);
-  return [refined || raw];
+
+  if (product.source === "name" || product.source === "image") {
+    push(raw);
+    if (refined !== raw) push(refined);
+
+    // Generation-aware compact query when the raw phrase is long
+    const identity = parseProductIdentity(raw, product.brand);
+    if (identity.iphoneGeneration) {
+      push(
+        [
+          "iphone",
+          identity.iphoneGeneration,
+          identity.storage[0] ? identity.storage[0] : null,
+          "pro max",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+    }
+
+    return queries.length > 0 ? queries : [raw];
+  }
+
+  push(refined || raw);
+  return queries;
 }
+
+/** Re-export for callers that only need overlap tokens. */
+export { significantTokens };

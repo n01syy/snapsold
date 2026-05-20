@@ -1,5 +1,5 @@
 import type { IdentifiedProduct, SoldListing } from "./types";
-import { refineTitleForSearch } from "./search-query";
+import { listingMatchesIdentity, parseProductIdentity } from "./product-tokens";
 
 /** Multi-packs / wholesale listings that skew medians for singles. */
 const BULK_TITLE =
@@ -19,8 +19,9 @@ export function filterRelevantListings(
 ): SoldListing[] {
   if (listings.length === 0) return listings;
 
-  const productTokens = significantTokens(
-    refineTitleForSearch(product.title, product.brand),
+  const identity = parseProductIdentity(
+    product.searchQuery ?? product.title,
+    product.brand,
   );
   const productIsSingle =
     SINGLE_UNIT_HINT.test(product.title) &&
@@ -37,38 +38,6 @@ export function filterRelevantListings(
       return false;
     }
 
-    if (productTokens.size === 0) return true;
-
-    const listingTokens = significantTokens(title);
-    let overlap = 0;
-    for (const t of productTokens) {
-      if (listingTokens.has(t)) overlap++;
-    }
-
-    // Require at least half of distinctive product tokens, min 2 hits
-    // when we have enough tokens to compare.
-    const required =
-      productTokens.size <= 2 ? 1 : Math.max(2, Math.ceil(productTokens.size * 0.5));
-    return overlap >= required;
+    return listingMatchesIdentity(title, identity);
   });
-}
-
-function significantTokens(text: string): Set<string> {
-  const STOP = new Set([
-    "and",
-    "or",
-    "the",
-    "with",
-    "for",
-    "of",
-    "new",
-    "used",
-    "free",
-  ]);
-  const tokens = text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 3 && !STOP.has(w));
-  return new Set(tokens);
 }
