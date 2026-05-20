@@ -13,7 +13,7 @@ interface LogoProps {
 export function Logo({ className }: LogoProps) {
   return (
     <Image
-      src="/snapsoldbanner.png"
+      src="/snapsoldbanner2.png"
       alt="Snapsold"
       width={1000}
       height={250}
