@@ -49,7 +49,12 @@ export function analyzePrices(
   }
 
   const rawSampleSize = rawSorted.length;
-  const rawPrices = rawSorted.map((l) => l.price);
+
+  // Bimodal samples (cheap parts/scams + real cards) — keep the upper cluster
+  let workingSorted = dropLowPriceCluster(rawSorted);
+  const clusterDropped = rawSampleSize - workingSorted.length;
+
+  const rawPrices = workingSorted.map((l) => l.price);
 
   const rawQ1 = percentile(rawPrices, 0.25);
   const rawQ3 = percentile(rawPrices, 0.75);
@@ -57,16 +62,16 @@ export function analyzePrices(
   const lowerFence = rawQ1 - 1.5 * rawIqr;
   const upperFence = rawQ3 + 1.5 * rawIqr;
 
-  let cleanedListings = rawSorted.filter(
+  let cleanedListings = workingSorted.filter(
     (l) => l.price >= lowerFence && l.price <= upperFence,
   );
   // Pathological case — everything looks like an "outlier" relative
   // to itself (e.g. two-element samples). Fall back to raw data so
   // downstream computations don't divide by zero.
-  if (cleanedListings.length === 0) cleanedListings = [...rawSorted];
+  if (cleanedListings.length === 0) cleanedListings = [...workingSorted];
 
   const cleaned = cleanedListings.map((l) => l.price);
-  const outliersRemoved = rawSampleSize - cleaned.length;
+  const outliersRemoved = rawSampleSize - cleaned.length + clusterDropped;
 
   const cleanedQ1 = percentile(cleaned, 0.25);
   const median = percentile(cleaned, 0.5);
@@ -323,6 +328,45 @@ function pickRecentSales(
       hasBox: l.hasBox,
       url: l.url,
     }));
+}
+
+/**
+ * When a sample has two distinct price clusters (parts/scams low,
+ * real products high), keep the upper cluster for recommended pricing.
+ */
+function dropLowPriceCluster(sorted: SoldListing[]): SoldListing[] {
+  if (sorted.length < 6) return sorted;
+
+  const prices = sorted.map((l) => l.price);
+  let maxGap = 0;
+  let gapIdx = 1;
+
+  for (let i = 1; i < prices.length; i++) {
+    const gap = prices[i] - prices[i - 1];
+    if (gap > maxGap) {
+      maxGap = gap;
+      gapIdx = i;
+    }
+  }
+
+  if (gapIdx <= 0 || gapIdx >= prices.length) return sorted;
+
+  const lower = prices.slice(0, gapIdx);
+  const upper = prices.slice(gapIdx);
+  const lowerMed = percentile(lower, 0.5);
+  const upperMed = percentile(upper, 0.5);
+  const overallMed = percentile(prices, 0.5);
+
+  if (
+    upperMed > lowerMed * 2.2 &&
+    maxGap > overallMed * 0.3 &&
+    upper.length >= 3
+  ) {
+    const threshold = (prices[gapIdx - 1] + prices[gapIdx]) / 2;
+    return sorted.filter((l) => l.price >= threshold);
+  }
+
+  return sorted;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { IdentifiedProduct, SoldListing } from "./types";
 import {
+  isImplausibleWorkingPrice,
   isPartsOrAccessoryListing,
   queryExpectsCompleteUnit,
 } from "./listing-completeness";
@@ -37,6 +38,10 @@ export function filterRelevantListings(
     const title = listing.title;
 
     if (expectsComplete && isPartsOrAccessoryListing(title, listing.condition, queryText)) {
+      return false;
+    }
+
+    if (isImplausibleWorkingPrice(title, listing.price, queryText)) {
       return false;
     }
 

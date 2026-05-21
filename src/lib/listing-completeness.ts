@@ -50,7 +50,7 @@ const UNRELATED_TO_GPU =
 
 /** Title signals a complete graphics card listing. */
 const FULL_GPU_SIGNALS =
-  /\b(geforce|graphics card|video card|gpu|radeon|founders edition|reference card|gaming oc|gaming x|suprim|ventus|tuf gaming|rog strix|aorus|nitro\+|pulse|red devil|phantom|eagle|windforce|gaming trio|challenger|macpro|quadro)\b/i;
+  /\b(geforce|graphics card|video card|gpu|radeon|founders edition|reference card|gaming oc|gaming x|suprim|ventus|tuf gaming|rog strix|rog matrix|rog astral|aorus|nitro\+|pulse|red devil|phantom|eagle|windforce|gaming trio|challenger|quadro|astral|igame|colorful|inno3d|zotac|pny|palit|kfa2|gainward|galax|rtx\s*\d{4})\b/i;
 
 /** eBay negative keywords appended to searches for complete-unit queries. */
 export const COMPLETE_UNIT_SEARCH_EXCLUSIONS =
@@ -79,6 +79,46 @@ function hasFullGpuProductSignals(title: string): boolean {
 }
 
 /**
+ * Minimum plausible sold price for a working GPU of this chip tier.
+ * Filters scam/joke "NEW" listings ($211 RTX 5090, etc.).
+ */
+export function gpuChipPriceFloor(text: string): number | null {
+  const t = text.toLowerCase();
+  const spaced = t.match(/\b(?:rtx|gtx)\s*-?\s*(\d{3,4})\b/);
+  const glued = t.match(/\b(?:rtx|gtx)(\d{3,4})\b/);
+  const tier = spaced
+    ? parseInt(spaced[1], 10)
+    : glued
+      ? parseInt(glued[1], 10)
+      : null;
+  if (tier === null) return null;
+  if (tier >= 5090) return 1800;
+  if (tier >= 5080) return 1200;
+  if (tier >= 5070) return 700;
+  if (tier >= 4090) return 850;
+  if (tier >= 4080) return 550;
+  if (tier >= 4070) return 380;
+  if (tier >= 3090) return 480;
+  if (tier >= 3080) return 320;
+  if (tier >= 3060) return 180;
+  return null;
+}
+
+export function isImplausibleWorkingPrice(
+  title: string,
+  price: number,
+  query: string,
+): boolean {
+  if (!queryExpectsCompleteUnit(query)) return false;
+  const category = inferProductCategory(query);
+  if (category === "gpu") {
+    const floor = gpuChipPriceFloor(`${query} ${title}`);
+    if (floor !== null && price < floor) return true;
+  }
+  return false;
+}
+
+/**
  * True when a listing is parts, an accessory, or an incomplete unit
  * and should not inform pricing for a complete-product search.
  */
@@ -99,13 +139,8 @@ export function isPartsOrAccessoryListing(
   if (GPU_ACCESSORY.test(t)) return true;
   if (PARTIAL_GPU.test(t)) return true;
 
-  // Internal condition enum — eBay "For parts" maps to "broken"
-  if (expectsComplete && cond === "broken") {
-    if (PARTS_OR_INCOMPLETE.test(t)) return true;
-    if (GPU_ACCESSORY.test(t)) return true;
-    if (PARTIAL_GPU.test(t)) return true;
-    if (category === "gpu" && !hasFullGpuProductSignals(t)) return true;
-  }
+  // Working-unit pricing: never include broken / for-parts rows
+  if (expectsComplete && cond === "broken") return true;
 
   if (ACCESSORY_NOT_PRODUCT.test(t) && !/\bkeyboard\b/.test(t)) return true;
 
