@@ -11,7 +11,7 @@ const PARTS_QUERY =
   /\b(for parts|parts only|part only|replacement part|repair part|spare part|screen replacement|battery replacement|fix only|cooler only|keycaps only|shell only|housing only|board only|logic board|water block)\b/i;
 
 const GPU_QUERY =
-  /\b(rtx|gtx|rx \d|rx\d|geforce|radeon|graphics card|video card|gpu|quadro|tesla|arc a\d)\b/i;
+  /\b(?:rtx\s*\d{3,4}|gtx\s*\d{3,4}|rtx\d{3,4}|gtx\d{3,4}|rx\s?\d{3,4}|geforce|radeon|graphics card|video card|gpu|quadro|tesla|arc a\d)\b/i;
 
 const PHONE_QUERY =
   /\b(iphone|galaxy s|galaxy z|pixel \d|pixel\d|oneplus|android phone|smartphone)\b/i;
@@ -58,8 +58,21 @@ export const COMPLETE_UNIT_SEARCH_EXCLUSIONS =
 
 type ProductCategory = "gpu" | "phone" | "console" | "keyboard" | "generic";
 
+/**
+ * Expand glued model names so "rtx5090" and "rtx 5090" share the same logic.
+ */
+export function normalizeProductQuery(text: string): string {
+  return text
+    .replace(/\b(rtx|gtx)(\d{3,4})\b/gi, "$1 $2")
+    .replace(/\biphone(se|\d{1,2})\b/gi, "iphone $1")
+    .replace(/\b(galaxy)(s\d{1,2})\b/gi, "$1 $2")
+    .replace(/\b(pixel)(\d{1,2})\b/gi, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function inferProductCategory(query: string): ProductCategory {
-  const q = query.toLowerCase();
+  const q = normalizeProductQuery(query).toLowerCase();
   if (GPU_QUERY.test(q)) return "gpu";
   if (PHONE_QUERY.test(q)) return "phone";
   if (CONSOLE_QUERY.test(q)) return "console";
@@ -109,10 +122,11 @@ export function isImplausibleWorkingPrice(
   price: number,
   query: string,
 ): boolean {
-  if (!queryExpectsCompleteUnit(query)) return false;
-  const category = inferProductCategory(query);
+  const normalizedQuery = normalizeProductQuery(query);
+  if (!queryExpectsCompleteUnit(normalizedQuery)) return false;
+  const category = inferProductCategory(normalizedQuery);
   if (category === "gpu") {
-    const floor = gpuChipPriceFloor(`${query} ${title}`);
+    const floor = gpuChipPriceFloor(`${normalizedQuery} ${title}`);
     if (floor !== null && price < floor) return true;
   }
   return false;
@@ -128,7 +142,7 @@ export function isPartsOrAccessoryListing(
   query?: string,
 ): boolean {
   const t = title.toLowerCase();
-  const q = (query ?? "").toLowerCase();
+  const q = normalizeProductQuery(query ?? "").toLowerCase();
   const cond = (condition ?? "").toLowerCase();
   const category = inferProductCategory(q);
   const expectsComplete = queryExpectsCompleteUnit(q);

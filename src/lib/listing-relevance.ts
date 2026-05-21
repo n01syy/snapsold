@@ -2,6 +2,7 @@ import type { IdentifiedProduct, SoldListing } from "./types";
 import {
   isImplausibleWorkingPrice,
   isPartsOrAccessoryListing,
+  normalizeProductQuery,
   queryExpectsCompleteUnit,
 } from "./listing-completeness";
 import { listingMatchesIdentity, parseProductIdentity } from "./product-tokens";
@@ -28,7 +29,9 @@ export function filterRelevantListings(
     product.searchQuery ?? product.title,
     product.brand,
   );
-  const queryText = product.searchQuery ?? product.title;
+  const queryText = normalizeProductQuery(
+    product.searchQuery ?? product.title,
+  );
   const expectsComplete = queryExpectsCompleteUnit(queryText);
   const productIsSingle =
     SINGLE_UNIT_HINT.test(product.title) &&

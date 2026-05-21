@@ -1,3 +1,5 @@
+import { normalizeProductQuery } from "./listing-completeness";
+
 /**
  * Tokenization and identity parsing for eBay search + listing relevance.
  * Preserves short model numbers (e.g. iPhone "17", keyboard "sk80").
@@ -99,27 +101,28 @@ export function parseProductIdentity(
   brand?: string,
 ): ProductIdentity {
   const normalized = normalize(text);
-  const modelCodes = extractModelCodes(normalized);
-  const tokens = significantTokens(text);
+  const normalizedQuery = normalize(normalizeProductQuery(text));
+  const modelCodes = extractModelCodes(normalizedQuery);
+  const tokens = significantTokens(normalizeProductQuery(text));
 
   let brandToken: string | null = null;
   if (brand) {
     brandToken = brand.toLowerCase().trim();
     if (brandToken.length >= 2) tokens.add(brandToken);
   } else {
-    brandToken = extractBrandToken(normalized, modelCodes);
+    brandToken = extractBrandToken(normalizedQuery, modelCodes);
     if (brandToken) tokens.add(brandToken);
   }
 
   return {
-    text: normalized,
+    text: normalizedQuery,
     tokens,
     brandToken,
     modelCodes,
-    iphoneGeneration: extractIphoneGeneration(normalized),
-    galaxyGeneration: extractGalaxyGeneration(normalized),
-    pixelGeneration: extractPixelGeneration(normalized),
-    storage: extractStorage(normalized),
+    iphoneGeneration: extractIphoneGeneration(normalizedQuery),
+    galaxyGeneration: extractGalaxyGeneration(normalizedQuery),
+    pixelGeneration: extractPixelGeneration(normalizedQuery),
+    storage: extractStorage(normalizedQuery),
   };
 }
 

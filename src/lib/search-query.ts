@@ -1,5 +1,5 @@
 import type { IdentifiedProduct } from "./types";
-import { withCompleteUnitExclusions } from "./listing-completeness";
+import { withCompleteUnitExclusions, normalizeProductQuery } from "./listing-completeness";
 import { parseProductIdentity, significantTokens } from "./product-tokens";
 
 const STOP_WORDS = new Set([
@@ -113,7 +113,9 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
     return queries.length > 0 ? queries : [product.title.trim()];
   }
 
-  const raw = (product.searchQuery ?? product.title).trim();
+  const raw = normalizeProductQuery(
+    (product.searchQuery ?? product.title).trim(),
+  );
   const refined = refineTitleForSearch(raw, product.brand);
 
   if (product.source === "name" || product.source === "image") {
