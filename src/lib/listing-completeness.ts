@@ -21,6 +21,9 @@ const CONSOLE_QUERY =
 
 const KEYBOARD_QUERY = /\b(keyboard|keychron|womier|keychron)\b/i;
 
+const CPU_QUERY =
+  /\b(?:ryzen\s*[3579]\s*\d{4}[a-z]{0,3}|amd ryzen|threadripper|intel core i[3579]|core i[3579]-?\d{4,5}|i[3579]-?\d{4,5}[a-z]{0,3}\b|xeon\s+[a-z]?\d|\bxeon\b)\b/i;
+
 /**
  * Components sold alone — never the full product unless the query
  * is itself for that component category.
@@ -52,6 +55,17 @@ const UNRELATED_TO_GPU =
 const FULL_GPU_SIGNALS =
   /\b(geforce|graphics card|video card|gpu|radeon|founders edition|reference card|gaming oc|gaming x|suprim|ventus|tuf gaming|rog strix|rog matrix|rog astral|aorus|nitro\+|pulse|red devil|phantom|eagle|windforce|gaming trio|challenger|quadro|astral|igame|colorful|inno3d|zotac|pny|palit|kfa2|gainward|galax|rtx\s*\d{4})\b/i;
 
+/** Standalone CPU listing — not a PC, motherboard, or cooler. */
+const FULL_CPU_SIGNALS =
+  /\b(processor|cpu|boxed|tray|oem|retail box|am[45]\s*ready|\d{4}[a-z]{0,3}x?\b.*\b(processor|cpu)\b|\b(processor|cpu)\b.*\b(ryzen|intel|core i[3579]|xeon))/i;
+
+const CPU_NOT_STANDALONE =
+  /\b(motherboard|mobo|mainboard|combo|bundle|kit with|w\/ motherboard|with motherboard|gaming pc|gaming desktop|skytech|ibuypower|cyberpower|prebuilt|custom build|desktop pc)\b/i;
+
+/** eBay negative keywords for standalone CPU searches. */
+export const CPU_SEARCH_EXCLUSIONS =
+  '-PC -"gaming PC" -desktop -Skytech -iBuyPower -CyberPower -motherboard -mobo -combo -RTX -GeForce -Radeon -"32GB" -"16GB"';
+
 /** eBay negative keywords — parts, PCs, laptops (GPU searches only). */
 export const GPU_SEARCH_EXCLUSIONS =
   '-PC -desktop -laptop -notebook -Omen -"gaming PC" -"gaming pc" -Ryzen -"Core i7" -"Core i5" -"Core i9" -"32GB" -"16GB" -"custom build" -iBuyPower -CyberPower';
@@ -62,10 +76,10 @@ export const COMPLETE_UNIT_SEARCH_EXCLUSIONS =
 
 /** Full desktops, prebuilts, laptops — not standalone graphics cards. */
 const COMPUTER_SYSTEM =
-  /\b(gaming pc|gaming desktop|gaming computer|desktop pc|desktop computer|custom pc|custom built|custom build|prebuilt pc|pre-built pc|prebuilt gaming|complete pc|full pc|pc build|pc system|tower pc|hp omen|dell alienware|dell g1[56]|dell xps|lenovo legion|cyberpower|ibuypower|skytech gaming|intel nuc|mini pc|all in one pc|aio pc|windows 11 home|win 11 pro)\b/i;
+  /\b(gaming pc|gaming desktop|gaming computer|desktop pc|desktop computer|custom pc|custom built|custom build|prebuilt pc|pre-built pc|prebuilt gaming|complete pc|full pc|pc build|pc system|tower pc|hp omen|dell alienware|dell g1[56]|dell xps|lenovo legion|cyberpower|ibuypower|skytech\b|skytech gaming|intel nuc|mini pc|all in one pc|aio pc|windows 11 home|win 11 pro)\b/i;
 
 const CPU_IN_TITLE =
-  /\b(intel core i[3579]-?\d{4,5}|core i[3579]-?\d{4,5}|i[3579]-?\d{4,5}f\b|i[3579]-?\d{4,5}k\b|ryzen [579]\s*\d{4}|amd ryzen [579]|amd ryzen\d)\b/i;
+  /\b(intel core i[3579]-?\d{4,5}|core i[3579]-?\d{4,5}|i[3579]-?\d{4,5}[a-z]{0,3}\b|ryzen\s*[3579]\s*\d{4}[a-z]{0,3}|amd ryzen\s*[3579]?\s*\d{4}[a-z]{0,3}|amd ryzen\d)\b/i;
 
 const SYSTEM_RAM_STORAGE =
   /\b(\d{2}gb ddr[45]|ddr[45]-\d{4,5}|\d{1,2}tb nvme|\d{1,2}tb ssd|\d{2}gb ram)\b/i;
@@ -73,7 +87,7 @@ const SYSTEM_RAM_STORAGE =
 const LAPTOP_WITH_GPU =
   /\b(laptop|notebook|chromebook|macbook|thinkpad|spectre x360)\b/i;
 
-type ProductCategory = "gpu" | "phone" | "console" | "keyboard" | "generic";
+type ProductCategory = "gpu" | "cpu" | "phone" | "console" | "keyboard" | "generic";
 
 /**
  * Expand glued model names so "rtx5090" and "rtx 5090" share the same logic.
@@ -115,10 +129,39 @@ export function isComputerSystemListing(title: string): boolean {
 export function inferProductCategory(query: string): ProductCategory {
   const q = normalizeProductQuery(query).toLowerCase();
   if (GPU_QUERY.test(q)) return "gpu";
+  if (CPU_QUERY.test(q)) return "cpu";
   if (PHONE_QUERY.test(q)) return "phone";
   if (CONSOLE_QUERY.test(q)) return "console";
   if (KEYBOARD_QUERY.test(q)) return "keyboard";
   return "generic";
+}
+
+function hasStandaloneCpuSignals(title: string): boolean {
+  const t = title.toLowerCase();
+  if (CPU_NOT_STANDALONE.test(t)) return false;
+  if (isComputerSystemListing(t)) return false;
+  if (FULL_CPU_SIGNALS.test(t)) return true;
+  // "AMD Ryzen 7 9700X" without explicit "processor" — still a CPU if not a PC
+  if (/\b(ryzen\s*[3579]\s*\d{4}[a-z]{0,3}|core i[3579]-?\d{4,5}|i[3579]-?\d{4,5}[a-z]{0,3})\b/i.test(t)) {
+    return !/\b(gaming pc|desktop|motherboard|rtx|geforce|radeon|graphics)\b/i.test(t);
+  }
+  return false;
+}
+
+/** Reject PC/bundle prices on standalone CPU searches. */
+export function cpuChipPriceCeiling(text: string): number | null {
+  const t = text.toLowerCase();
+  if (/\bryzen\s*9\b|\bthreadripper\b|\bi9-\d|\bcore i9\b|\b9950|\b9900|\b9800/i.test(t)) {
+    return 750;
+  }
+  if (/\bryzen\s*[57]\b|\b9700|\b9600|\b8700|\bi[57]-\d|\bcore i[57]\b/i.test(t)) {
+    return 450;
+  }
+  if (/\bryzen\s*3\b|\bi3-\d|\bcore i3\b/i.test(t)) {
+    return 220;
+  }
+  if (CPU_QUERY.test(t)) return 500;
+  return null;
 }
 
 export function queryExpectsCompleteUnit(query: string): boolean {
@@ -194,6 +237,10 @@ export function isImplausibleWorkingPrice(
     const ceiling = gpuChipPriceCeiling(combined);
     if (ceiling !== null && price > ceiling) return true;
   }
+  if (category === "cpu") {
+    const ceiling = cpuChipPriceCeiling(`${normalizedQuery} ${title}`);
+    if (ceiling !== null && price > ceiling) return true;
+  }
   return false;
 }
 
@@ -254,6 +301,13 @@ export function isPartsOrAccessoryListing(
     if (!hasFullGpuProductSignals(t)) return true;
   }
 
+  // CPU-specific: must be a standalone processor, not a PC or motherboard combo
+  if (expectsComplete && category === "cpu") {
+    if (isComputerSystemListing(t)) return true;
+    if (CPU_NOT_STANDALONE.test(t)) return true;
+    if (!hasStandaloneCpuSignals(t)) return true;
+  }
+
   return false;
 }
 
@@ -269,6 +323,9 @@ export function withCompleteUnitExclusions(query: string): string {
   if (inferProductCategory(normalized) === "gpu") {
     return `${base} ${GPU_SEARCH_EXCLUSIONS}`;
   }
+  if (inferProductCategory(normalized) === "cpu") {
+    return `${base} ${CPU_SEARCH_EXCLUSIONS}`;
+  }
   return base;
 }
 
@@ -276,4 +333,10 @@ export function withCompleteUnitExclusions(query: string): string {
 export function buildGpuCardSearchQuery(query: string): string {
   const q = normalizeProductQuery(query);
   return `${q} graphics card ${COMPLETE_UNIT_SEARCH_EXCLUSIONS} ${GPU_SEARCH_EXCLUSIONS}`;
+}
+
+/** Primary eBay query for a standalone CPU/processor. */
+export function buildCpuProcessorSearchQuery(query: string): string {
+  const q = normalizeProductQuery(query);
+  return `${q} processor ${COMPLETE_UNIT_SEARCH_EXCLUSIONS} ${CPU_SEARCH_EXCLUSIONS}`;
 }

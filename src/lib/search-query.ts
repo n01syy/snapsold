@@ -1,5 +1,6 @@
 import type { IdentifiedProduct } from "./types";
 import {
+  buildCpuProcessorSearchQuery,
   buildGpuCardSearchQuery,
   inferProductCategory,
   withCompleteUnitExclusions,
@@ -126,6 +127,7 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
   if (product.source === "name" || product.source === "image") {
     const identity = parseProductIdentity(raw, product.brand);
     const isGpu = inferProductCategory(raw) === "gpu";
+    const isCpu = inferProductCategory(raw) === "cpu";
 
     if (isGpu) {
       // Graphics-card searches first — not bare chip name (pulls in full PCs)
@@ -139,6 +141,15 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
             `geforce ${tiMatch[1]} ${tiMatch[2]}${suffix} graphics card`,
           ),
         );
+      }
+    } else if (isCpu) {
+      push(buildCpuProcessorSearchQuery(raw));
+      push(withCompleteUnitExclusions(`${raw} cpu`));
+      if (/\bryzen\b/i.test(raw)) {
+        push(withCompleteUnitExclusions(`AMD ${raw} processor`));
+      }
+      if (/\bcore i[3579]\b/i.test(raw) || /\bi[3579]-?\d/i.test(raw)) {
+        push(withCompleteUnitExclusions(`Intel ${raw} processor`));
       }
     } else {
       pushComplete(raw);
@@ -158,7 +169,7 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       );
     }
 
-    if (identity.modelCodes.length > 0 && !isGpu) {
+    if (identity.modelCodes.length > 0 && !isGpu && !isCpu) {
       const code = identity.modelCodes[0];
       const brand = identity.brandToken;
       if (brand) {
@@ -169,13 +180,19 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       }
     }
 
-    if (!isGpu && /\b(rtx|gtx)\s*\d{3,4}\b/i.test(raw)) {
+    if (!isGpu && !isCpu && /\b(rtx|gtx)\s*\d{3,4}\b/i.test(raw)) {
       pushComplete(`${raw} graphics card`);
     }
 
     return queries.length > 0
       ? queries
-      : [isGpu ? buildGpuCardSearchQuery(raw) : withCompleteUnitExclusions(raw)];
+      : [
+          isGpu
+            ? buildGpuCardSearchQuery(raw)
+            : isCpu
+              ? buildCpuProcessorSearchQuery(raw)
+              : withCompleteUnitExclusions(raw),
+        ];
   }
 
   pushComplete(refined || raw);
