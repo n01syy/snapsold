@@ -1,6 +1,6 @@
 /**
  * Tokenization and identity parsing for eBay search + listing relevance.
- * Preserves short model numbers (e.g. iPhone "17") that generic tokenizers drop.
+ * Preserves short model numbers (e.g. iPhone "17", keyboard "sk80").
  */
 
 const TOKEN_STOP = new Set([
@@ -44,9 +44,30 @@ const TOKEN_STOP = new Set([
   "per",
   "each",
   "pack",
+  // Generic product descriptors — not useful for distinguishing models
+  "mechanical",
+  "keyboard",
+  "keyboards",
+  "gaming",
+  "wireless",
+  "wired",
+  "percent",
+  "rgb",
+  "hot",
+  "swap",
+  "hotswap",
+  "bluetooth",
+  "usb",
+  "type",
+  "custom",
+  "edition",
+  "pro",
+  "max",
+  "plus",
+  "mini",
 ]);
 
-/** Distinctive tokens used for overlap scoring. */
+/** Sold as accessories/parts — handled in listing-completeness.ts */
 export function significantTokens(text: string): Set<string> {
   const out = new Set<string>();
   for (const raw of normalize(text).split(/\s+/)) {
@@ -55,24 +76,21 @@ export function significantTokens(text: string): Set<string> {
       out.add(raw);
       continue;
     }
-    // Keep 2-char model gens (11–17) and storage like "1tb" handled elsewhere
     if (/^\d{2}$/.test(raw)) out.add(raw);
   }
+  for (const code of extractModelCodes(text)) out.add(code);
   return out;
 }
 
 export type ProductIdentity = {
-  /** Lowercased search text used for parsing. */
   text: string;
-  /** Distinctive overlap tokens. */
   tokens: Set<string>;
-  /** Required iPhone generation, e.g. "17" or "se". */
+  brandToken: string | null;
+  /** Alphanumeric SKUs like sk80, wk61, xm5 — must match exactly. */
+  modelCodes: string[];
   iphoneGeneration: string | null;
-  /** Required Galaxy S generation, e.g. "24". */
   galaxyGeneration: string | null;
-  /** Required Pixel generation, e.g. "8". */
   pixelGeneration: string | null;
-  /** Required storage tiers, e.g. ["256gb"]. */
   storage: string[];
 };
 
@@ -81,15 +99,23 @@ export function parseProductIdentity(
   brand?: string,
 ): ProductIdentity {
   const normalized = normalize(text);
+  const modelCodes = extractModelCodes(normalized);
   const tokens = significantTokens(text);
+
+  let brandToken: string | null = null;
   if (brand) {
-    const b = brand.toLowerCase().trim();
-    if (b.length >= 2) tokens.add(b);
+    brandToken = brand.toLowerCase().trim();
+    if (brandToken.length >= 2) tokens.add(brandToken);
+  } else {
+    brandToken = extractBrandToken(normalized, modelCodes);
+    if (brandToken) tokens.add(brandToken);
   }
 
   return {
     text: normalized,
     tokens,
+    brandToken,
+    modelCodes,
     iphoneGeneration: extractIphoneGeneration(normalized),
     galaxyGeneration: extractGalaxyGeneration(normalized),
     pixelGeneration: extractPixelGeneration(normalized),
@@ -103,6 +129,75 @@ function normalize(text: string): string {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Alphanumeric model / SKU tokens, e.g. sk80, wk61, th80, xm5, wh1000.
+ * Also merges spaced forms: "sk 80" → sk80.
+ */
+export function extractModelCodes(text: string): string[] {
+  const t = normalize(text);
+  const codes = new Set<string>();
+
+  for (const m of t.matchAll(/\b([a-z]{1,6}\d{1,4}[a-z]?\d*)\b/g)) {
+    const code = m[1];
+    if (isLikelyModelCode(code)) codes.add(code);
+  }
+
+  const tokens = t.split(/\s+/);
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const a = tokens[i];
+    const b = tokens[i + 1];
+    if (/^[a-z]{1,5}$/.test(a) && /^\d{1,4}[a-z]?$/.test(b)) {
+      const merged = `${a}${b}`;
+      if (isLikelyModelCode(merged)) codes.add(merged);
+    }
+  }
+
+  return [...codes];
+}
+
+function isLikelyModelCode(code: string): boolean {
+  if (code.length < 3) return false;
+  if (/^\d+(gb|tb)$/.test(code)) return false;
+  if (/^iphone\d*/.test(code)) return false;
+  if (/^galaxy/.test(code)) return false;
+  if (/^pixel\d*/.test(code)) return false;
+  // Pure generation numbers handled elsewhere
+  if (/^\d{1,2}$/.test(code)) return false;
+  return /[a-z]/i.test(code) && /\d/.test(code);
+}
+
+function extractBrandToken(text: string, modelCodes: string[]): string | null {
+  const modelSet = new Set(modelCodes);
+  for (const raw of text.split(/\s+/)) {
+    if (!raw || TOKEN_STOP.has(raw)) continue;
+    if (modelSet.has(raw)) continue;
+    if (/^\d+(gb|tb)$/.test(raw)) continue;
+    if (/^\d{1,3}$/.test(raw)) continue;
+    if (/^[a-z]{3,}$/.test(raw)) return raw;
+  }
+  return null;
+}
+
+export function listingIncludesModelCode(
+  listingTitle: string,
+  code: string,
+): boolean {
+  const compactListing = normalize(listingTitle).replace(/\s+/g, "");
+  const compactCode = code.toLowerCase().replace(/\s+/g, "");
+  if (compactListing.includes(compactCode)) return true;
+
+  const spaced = normalize(listingTitle);
+  if (spaced.includes(code.toLowerCase())) return true;
+
+  const parts = code.match(/^([a-z]+)(\d+[a-z]?)$/i);
+  if (parts) {
+    const spacedForm = `${parts[1]} ${parts[2]}`;
+    if (spaced.includes(spacedForm)) return true;
+  }
+
+  return false;
 }
 
 /** e.g. "iphone 17 pro" → "17", "iphone se" → "se", "iphone17" → "17" */
@@ -147,7 +242,6 @@ export function extractStorage(text: string): string[] {
 
 /**
  * True when a sold listing plausibly matches the identified product.
- * Enforces generation + storage when the query specifies them.
  */
 export function listingMatchesIdentity(
   listingTitle: string,
@@ -155,6 +249,17 @@ export function listingMatchesIdentity(
 ): boolean {
   const listing = normalize(listingTitle);
   if (!listing) return false;
+
+  if (product.modelCodes.length > 0) {
+    for (const code of product.modelCodes) {
+      if (!listingIncludesModelCode(listingTitle, code)) return false;
+    }
+
+    const listingCodes = extractModelCodes(listing);
+    for (const lc of listingCodes) {
+      if (!product.modelCodes.includes(lc)) return false;
+    }
+  }
 
   if (product.iphoneGeneration) {
     const listingGen = extractIphoneGeneration(listing);
@@ -177,8 +282,10 @@ export function listingMatchesIdentity(
   if (product.pixelGeneration) {
     const listingGen = extractPixelGeneration(listing);
     if (listingGen && listingGen !== product.pixelGeneration) return false;
-    if (!listing.includes(`pixel ${product.pixelGeneration}`) &&
-        !listing.includes(`pixel${product.pixelGeneration}`)) {
+    if (
+      !listing.includes(`pixel ${product.pixelGeneration}`) &&
+      !listing.includes(`pixel${product.pixelGeneration}`)
+    ) {
       return false;
     }
   }
@@ -194,6 +301,9 @@ export function listingMatchesIdentity(
   }
 
   if (product.tokens.size === 0) return true;
+
+  // Model-anchored queries were fully validated above.
+  if (product.modelCodes.length > 0) return true;
 
   const listingTokens = significantTokens(listingTitle);
   let overlap = 0;

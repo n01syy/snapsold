@@ -1,4 +1,5 @@
 import type { IdentifiedProduct } from "./types";
+import { withCompleteUnitExclusions } from "./listing-completeness";
 import { parseProductIdentity, significantTokens } from "./product-tokens";
 
 const STOP_WORDS = new Set([
@@ -39,6 +40,15 @@ const STOP_WORDS = new Set([
   "mint",
   "renewed",
   "refurbished",
+  "mechanical",
+  "keyboard",
+  "keyboards",
+  "gaming",
+  "wireless",
+  "wired",
+  "percent",
+  "rgb",
+  "hotswap",
 ]);
 
 /**
@@ -61,7 +71,10 @@ export function refineTitleForSearch(title: string, brand?: string): string {
   for (const w of rawTokens) {
     if (STOP_WORDS.has(w)) continue;
     const keep =
-      w.length >= 3 || /^\d{2}$/.test(w) || /^\d+(gb|tb)$/.test(w);
+      w.length >= 3 ||
+      /^\d{2}$/.test(w) ||
+      /^\d+(gb|tb)$/.test(w) ||
+      /^[a-z]{1,6}\d{1,4}[a-z]?\d*$/.test(w);
     if (!keep) continue;
     if (!out.includes(w)) out.push(w);
     if (out.length >= 8) break;
@@ -83,6 +96,9 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
     const trimmed = q.trim();
     if (trimmed && !queries.includes(trimmed)) queries.push(trimmed);
   };
+  const pushComplete = (q: string) => {
+    push(withCompleteUnitExclusions(q));
+  };
 
   if (product.source === "barcode") {
     const upc =
@@ -93,7 +109,7 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
     if (upc) push(upc);
 
     const refined = refineTitleForSearch(product.title, product.brand);
-    if (refined && refined !== upc) push(refined);
+    if (refined && refined !== upc) pushComplete(refined);
     return queries.length > 0 ? queries : [product.title.trim()];
   }
 
@@ -101,13 +117,12 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
   const refined = refineTitleForSearch(raw, product.brand);
 
   if (product.source === "name" || product.source === "image") {
-    push(raw);
-    if (refined !== raw) push(refined);
+    pushComplete(raw);
+    if (refined !== raw) pushComplete(refined);
 
-    // Generation-aware compact query when the raw phrase is long
     const identity = parseProductIdentity(raw, product.brand);
     if (identity.iphoneGeneration) {
-      push(
+      pushComplete(
         [
           "iphone",
           identity.iphoneGeneration,
@@ -119,10 +134,30 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       );
     }
 
-    return queries.length > 0 ? queries : [raw];
+    if (identity.modelCodes.length > 0) {
+      const code = identity.modelCodes[0];
+      const brand = identity.brandToken;
+      if (brand) {
+        pushComplete(`${brand} ${code}`);
+        pushComplete(`${brand} ${code} keyboard -keycap -keycaps`);
+      } else {
+        pushComplete(code);
+        // GPU-style model codes: insist on a graphics card in results
+        if (/^rtx|^gtx|^rx/i.test(code)) {
+          pushComplete(`${code} graphics card`);
+          pushComplete(`geforce ${code.replace(/^rtx/i, "RTX ")}`);
+        } else {
+          pushComplete(`${code} keyboard -keycap -keycaps`);
+        }
+      }
+    } else if (/\b(rtx|gtx)\s*\d{3,4}\b/i.test(raw) || /\b(rtx|gtx)\d{3,4}\b/i.test(raw)) {
+      pushComplete(`${raw} graphics card`);
+    }
+
+    return queries.length > 0 ? queries : [withCompleteUnitExclusions(raw)];
   }
 
-  push(refined || raw);
+  pushComplete(refined || raw);
   return queries;
 }
 

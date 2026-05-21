@@ -1,4 +1,8 @@
 import type { IdentifiedProduct, SoldListing } from "./types";
+import {
+  isPartsOrAccessoryListing,
+  queryExpectsCompleteUnit,
+} from "./listing-completeness";
 import { listingMatchesIdentity, parseProductIdentity } from "./product-tokens";
 
 /** Multi-packs / wholesale listings that skew medians for singles. */
@@ -23,12 +27,18 @@ export function filterRelevantListings(
     product.searchQuery ?? product.title,
     product.brand,
   );
+  const queryText = product.searchQuery ?? product.title;
+  const expectsComplete = queryExpectsCompleteUnit(queryText);
   const productIsSingle =
     SINGLE_UNIT_HINT.test(product.title) &&
     !BULK_TITLE.test(product.title);
 
   return listings.filter((listing) => {
     const title = listing.title;
+
+    if (expectsComplete && isPartsOrAccessoryListing(title, listing.condition, queryText)) {
+      return false;
+    }
 
     if (product.upc && title.replace(/\D/g, "").includes(product.upc)) {
       return true;
