@@ -1,5 +1,10 @@
 import type { IdentifiedProduct } from "./types";
-import { withCompleteUnitExclusions, normalizeProductQuery } from "./listing-completeness";
+import {
+  buildGpuCardSearchQuery,
+  inferProductCategory,
+  withCompleteUnitExclusions,
+  normalizeProductQuery,
+} from "./listing-completeness";
 import { parseProductIdentity, significantTokens } from "./product-tokens";
 
 const STOP_WORDS = new Set([
@@ -119,10 +124,27 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
   const refined = refineTitleForSearch(raw, product.brand);
 
   if (product.source === "name" || product.source === "image") {
-    pushComplete(raw);
-    if (refined !== raw) pushComplete(refined);
-
     const identity = parseProductIdentity(raw, product.brand);
+    const isGpu = inferProductCategory(raw) === "gpu";
+
+    if (isGpu) {
+      // Graphics-card searches first — not bare chip name (pulls in full PCs)
+      push(buildGpuCardSearchQuery(raw));
+      push(withCompleteUnitExclusions(`${raw} video card`));
+      const tiMatch = raw.match(/\b(rtx|gtx)\s*(\d{3,4})(?:\s*(ti|super))?\b/i);
+      if (tiMatch) {
+        const suffix = tiMatch[3] ? ` ${tiMatch[3]}` : "";
+        push(
+          withCompleteUnitExclusions(
+            `geforce ${tiMatch[1]} ${tiMatch[2]}${suffix} graphics card`,
+          ),
+        );
+      }
+    } else {
+      pushComplete(raw);
+      if (refined !== raw) pushComplete(refined);
+    }
+
     if (identity.iphoneGeneration) {
       pushComplete(
         [
@@ -136,27 +158,24 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       );
     }
 
-    if (identity.modelCodes.length > 0) {
+    if (identity.modelCodes.length > 0 && !isGpu) {
       const code = identity.modelCodes[0];
       const brand = identity.brandToken;
       if (brand) {
         pushComplete(`${brand} ${code}`);
         pushComplete(`${brand} ${code} keyboard -keycap -keycaps`);
       } else {
-        pushComplete(code);
-        // GPU-style model codes: insist on a graphics card in results
-        if (/^rtx|^gtx|^rx/i.test(code)) {
-          pushComplete(`${code} graphics card`);
-          pushComplete(`geforce ${code.replace(/^rtx/i, "RTX ")}`);
-        } else {
-          pushComplete(`${code} keyboard -keycap -keycaps`);
-        }
+        pushComplete(`${code} keyboard -keycap -keycaps`);
       }
-    } else if (/\b(rtx|gtx)\s*\d{3,4}\b/i.test(raw) || /\b(rtx|gtx)\d{3,4}\b/i.test(raw)) {
+    }
+
+    if (!isGpu && /\b(rtx|gtx)\s*\d{3,4}\b/i.test(raw)) {
       pushComplete(`${raw} graphics card`);
     }
 
-    return queries.length > 0 ? queries : [withCompleteUnitExclusions(raw)];
+    return queries.length > 0
+      ? queries
+      : [isGpu ? buildGpuCardSearchQuery(raw) : withCompleteUnitExclusions(raw)];
   }
 
   pushComplete(refined || raw);
