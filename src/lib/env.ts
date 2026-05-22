@@ -58,4 +58,9 @@ export const env = {
   get geminiVisionModel(): string {
     return process.env.GEMINI_VISION_MODEL ?? "gemini-2.5-flash";
   },
+
+  /** KicksDB key for StockX sneaker market data. Empty ⇒ skip. */
+  get kicksApiKey(): string {
+    return process.env.KICKS_API_KEY ?? "";
+  },
 };

@@ -7,6 +7,7 @@ import {
   normalizeProductQuery,
 } from "./listing-completeness";
 import { parseProductIdentity, significantTokens } from "./product-tokens";
+import { isLikelyKeyboardModelCode, isShoeProduct } from "./shoe-query";
 
 const STOP_WORDS = new Set([
   "and",
@@ -128,6 +129,8 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
     const identity = parseProductIdentity(raw, product.brand);
     const isGpu = inferProductCategory(raw) === "gpu";
     const isCpu = inferProductCategory(raw) === "cpu";
+    const isShoe = isShoeProduct(raw, product.brand);
+    const isKeyboard = inferProductCategory(raw) === "keyboard";
 
     if (isGpu) {
       // Graphics-card searches first — not bare chip name (pulls in full PCs)
@@ -151,6 +154,17 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       if (/\bcore i[3579]\b/i.test(raw) || /\bi[3579]-?\d/i.test(raw)) {
         push(withCompleteUnitExclusions(`Intel ${raw} processor`));
       }
+    } else if (isShoe) {
+      pushComplete(raw);
+      pushComplete(`${raw} sneakers`);
+      if (/\byeezy\b/i.test(raw)) {
+        pushComplete(`${raw} adidas`);
+        pushComplete(`${raw} slide`);
+      }
+      if (/\bjordan\b/i.test(raw)) {
+        pushComplete(`${raw} shoes`);
+      }
+      if (refined !== raw) pushComplete(refined);
     } else {
       pushComplete(raw);
       if (refined !== raw) pushComplete(refined);
@@ -169,7 +183,14 @@ export function buildEbaySearchQueries(product: IdentifiedProduct): string[] {
       );
     }
 
-    if (identity.modelCodes.length > 0 && !isGpu && !isCpu) {
+    if (
+      identity.modelCodes.length > 0 &&
+      !isGpu &&
+      !isCpu &&
+      !isShoe &&
+      (isKeyboard ||
+        isLikelyKeyboardModelCode(identity.modelCodes[0], raw))
+    ) {
       const code = identity.modelCodes[0];
       const brand = identity.brandToken;
       if (brand) {

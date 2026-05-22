@@ -35,6 +35,7 @@ import { DEFAULT_FIXED_FEE, DEFAULT_FVF_RATE, computeNet } from "@/lib/fees";
 import type {
   ConditionPrice,
   IdentifiedProduct,
+  MarketSourceInsight,
   PriceAnalysis,
   PriceTrend,
   RecentSale,
@@ -182,7 +183,8 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
                 )}
                 <motion.div variants={fadeUp}>
                   <Badge variant="secondary" className="border border-border/60">
-                    {analysis.sampleSize} sold · {analysis.windowDays}d
+                    {analysis.primarySource.label} · {analysis.sampleSize} sold ·{" "}
+                    {analysis.windowDays}d
                   </Badge>
                 </motion.div>
                 {analysis.outliersRemoved > 0 && (
@@ -226,6 +228,12 @@ export function AnalysisView({ product, analysis, onReset }: AnalysisViewProps) 
               <motion.div key={`fees-${resultKey}`} variants={fadeUp}>
                 <FeeRow prices={adjustedPrices} />
               </motion.div>
+
+              {analysis.supplementarySources.map((source) => (
+                <motion.div key={source.id} variants={fadeUp}>
+                  <SupplementaryMarketPanel source={source} />
+                </motion.div>
+              ))}
 
               {analysis.conditionBreakdown.length >= 2 && (
                 <motion.div variants={fadeUp}>
@@ -662,6 +670,64 @@ function FeeRow({
   );
 }
 
+function SupplementaryMarketPanel({ source }: { source: MarketSourceInsight }) {
+  return (
+    <div className="mt-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 sm:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/80 dark:text-emerald-200/80">
+            {source.label} market
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{source.detail}</p>
+          <p className="mt-1 text-sm font-medium leading-snug text-navy">
+            {source.productTitle}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{source.sampleLabel}</p>
+        </div>
+        <a
+          href={source.url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+        >
+          View on {source.label}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+      <div className="mt-3 grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
+        <div className="rounded-lg border border-border/50 bg-background/70 px-2 py-2 text-center">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Quick
+          </div>
+          <div className="mt-1 font-mono text-lg font-bold tabular-nums text-navy">
+            ${source.prices.quick}
+          </div>
+        </div>
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-center ring-1 ring-emerald-500/15">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/80 dark:text-emerald-200/80">
+            Market
+          </div>
+          <div className="mt-1 font-mono text-lg font-bold tabular-nums text-navy">
+            ${source.prices.recommended}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border/50 bg-background/70 px-2 py-2 text-center">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            High
+          </div>
+          <div className="mt-1 font-mono text-lg font-bold tabular-nums text-navy">
+            ${source.prices.max}
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+        StockX prices reflect current market asks, not eBay sold comps. Use alongside
+        the eBay recommendation above when listing locally or on eBay.
+      </p>
+    </div>
+  );
+}
+
 function RecentSalesPanel({
   sales,
   searchQuery,
@@ -676,7 +742,7 @@ function RecentSalesPanel({
     <motion.div variants={fadeUp} className="mt-5">
       <div className="flex items-center justify-between">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Recent sold listings
+          Recent eBay sold listings
         </div>
         <a
           href={allSoldUrl}

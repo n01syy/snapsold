@@ -1,4 +1,5 @@
 import { normalizeProductQuery } from "./listing-completeness";
+import { isShoeProduct } from "./shoe-query";
 
 /**
  * Tokenization and identity parsing for eBay search + listing relevance.
@@ -102,7 +103,11 @@ export function parseProductIdentity(
 ): ProductIdentity {
   const normalized = normalize(text);
   const normalizedQuery = normalize(normalizeProductQuery(text));
-  const modelCodes = extractModelCodes(normalizedQuery);
+  let modelCodes = extractModelCodes(normalizedQuery);
+  // Factory style codes (e.g. YS02) rarely appear in eBay sneaker titles.
+  if (isShoeProduct(normalizedQuery, brand)) {
+    modelCodes = [];
+  }
   const tokens = significantTokens(normalizeProductQuery(text));
 
   let brandToken: string | null = null;

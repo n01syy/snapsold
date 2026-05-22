@@ -155,7 +155,9 @@ async function fetchBestLiveListings(
   }
 
   if (best.length > 0) return best;
-  throw new ListingsNotFoundError(lastQuery);
+  throw new ListingsNotFoundError(
+    product.searchQuery?.trim() || queries[0] || lastQuery,
+  );
 }
 
 /**

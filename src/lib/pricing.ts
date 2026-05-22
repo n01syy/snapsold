@@ -191,6 +191,12 @@ export function analyzePrices(
     conditionBreakdown,
     boxedPremiumActual,
     recentSales,
+    primarySource: {
+      id: "ebay",
+      label: "eBay",
+      detail: `eBay sold · ${windowDays} days`,
+    },
+    supplementarySources: [],
   };
 }
 

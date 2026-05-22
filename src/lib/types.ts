@@ -134,6 +134,36 @@ export interface PriceAnalysis {
    * cleaned sample (no outliers) and ordered by recency.
    */
   recentSales: RecentSale[];
+  /** Primary comps source for the headline prices above. */
+  primarySource: MarketSourceLabel;
+  /**
+   * Extra marketplace snapshots (e.g. StockX for sneakers). These
+   * use each platform's own market data — not eBay sold comps.
+   */
+  supplementarySources: MarketSourceInsight[];
+}
+
+export interface MarketSourceLabel {
+  id: "ebay";
+  label: string;
+  detail: string;
+}
+
+/** Secondary pricing panel from a specialist marketplace. */
+export interface MarketSourceInsight {
+  id: "stockx";
+  label: string;
+  detail: string;
+  productTitle: string;
+  url: string;
+  imageUrl?: string;
+  prices: {
+    quick: number;
+    recommended: number;
+    max: number;
+  };
+  median: number;
+  sampleLabel: string;
 }
 
 /** Median-vs-median comparison for the early vs late half of the window. */

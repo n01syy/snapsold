@@ -4,6 +4,7 @@ import { getSoldListings } from "@/lib/ebay";
 import { enrichBarcodeProductTitle } from "@/lib/barcode-title";
 import { ListingsNotFoundError } from "@/lib/errors";
 import { identifyProduct } from "@/lib/identify";
+import { getSupplementaryMarketInsights } from "@/lib/market-insights";
 import { findMockProductById } from "@/lib/mock-data";
 import { analyzePrices } from "@/lib/pricing";
 import type {
@@ -97,9 +98,15 @@ export async function priceProductById(productId: string): Promise<AnalyzeResult
 async function runPricingFor(
   product: IdentifiedProduct,
 ): Promise<{ product: IdentifiedProduct; analysis: PriceAnalysis }> {
-  const listings = await getSoldListings(product);
+  const [listings, supplementarySources] = await Promise.all([
+    getSoldListings(product),
+    getSupplementaryMarketInsights(product),
+  ]);
   const enriched = enrichBarcodeProductTitle(product, listings);
-  const analysis = analyzePrices(listings, { windowDays: 14 });
+  const analysis = {
+    ...analyzePrices(listings, { windowDays: 14 }),
+    supplementarySources,
+  };
   return { product: enriched, analysis };
 }
 
